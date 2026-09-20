@@ -1,0 +1,1752 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Scoreboard">
+<meta name="theme-color" content="#0f0c29">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Scoreboard</title>
+<style>
+  :root{
+    --t1-a:#00c6ff; --t1-b:#0072ff;
+    --t2-a:#ff512f; --t2-b:#dd2476;
+    --bg-a:#0f0c29; --bg-b:#302b63; --bg-c:#24243e;
+    --gold:#ffd700;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none;}
+  html,body{margin:0;padding:0;height:100%; height:100dvh;}
+  body{
+    font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+    background:linear-gradient(135deg,var(--bg-a),var(--bg-b),var(--bg-c));
+    background-size:300% 300%;
+    animation:bgshift 18s ease infinite;
+    color:#fff;
+    overflow:hidden;
+  }
+  @keyframes bgshift{
+    0%{background-position:0% 50%;}
+    50%{background-position:100% 50%;}
+    100%{background-position:0% 50%;}
+  }
+
+  /* FLIP PAGE MECHANISM */
+  .flip-container{
+    width:100%; height:100%; height:100dvh;
+    perspective:2200px;
+  }
+  .flip-inner{
+    position:relative;
+    width:100%; height:100%;
+    transform-style:preserve-3d;
+    transition:transform .7s cubic-bezier(.45,.05,.55,.95);
+  }
+  .flip-inner.flipped{ transform:rotateY(180deg); }
+  .page{
+    position:absolute; inset:0;
+    backface-visibility:hidden;
+    -webkit-backface-visibility:hidden;
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+    padding:10px;
+  }
+  .page-back{ transform:rotateY(180deg); }
+
+  header{
+    text-align:center;
+    padding:8px 4px 6px;
+  }
+  header h1{
+    margin:0;
+    font-size:clamp(22px,6vw,34px);
+    letter-spacing:3px;
+    text-transform:uppercase;
+    background:linear-gradient(90deg,var(--t1-b),#fff,var(--t2-a));
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+    text-shadow:0 0 30px rgba(255,255,255,0.15);
+    animation:glow 3s ease-in-out infinite;
+  }
+  @keyframes glow{
+    0%,100%{filter:drop-shadow(0 0 6px rgba(255,255,255,0.15));}
+    50%{filter:drop-shadow(0 0 18px rgba(255,255,255,0.4));}
+  }
+
+  .toolbar{
+    display:flex;
+    justify-content:center;
+    gap:8px;
+    margin-top:8px;
+    flex-wrap:wrap;
+  }
+  .tool-btn{
+    background:rgba(255,255,255,0.08);
+    border:1px solid rgba(255,255,255,0.25);
+    color:#fff;
+    padding:8px 14px;
+    border-radius:30px;
+    font-size:12.5px;
+    letter-spacing:0.5px;
+    cursor:pointer;
+    backdrop-filter:blur(6px);
+    transition:all .2s ease;
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .tool-btn:hover{background:rgba(255,255,255,0.18); transform:translateY(-2px);}
+  .tool-btn:active{transform:translateY(0px) scale(0.96);}
+
+  .swipe-hint{
+    text-align:center;
+    font-size:11px;
+    color:rgba(255,255,255,0.35);
+    margin-top:6px;
+    letter-spacing:0.5px;
+  }
+
+  /* TIMER */
+  .timer-display{
+    text-align:center;
+    margin:10px 0 2px;
+    display:none;
+  }
+  .timer-time{
+    font-size:clamp(28px,9vw,46px);
+    font-weight:800;
+    letter-spacing:2px;
+    font-variant-numeric:tabular-nums;
+    text-shadow:0 0 20px rgba(255,255,255,0.25);
+  }
+  .timer-time.warning{ color:#ff5050; animation:timerpulse .6s infinite; }
+  .timer-time.locked{ color:#ff2d2d; }
+  @keyframes timerpulse{0%,100%{opacity:1;}50%{opacity:0.35;}}
+  .timer-controls{
+    display:flex; justify-content:center; gap:8px; margin-top:6px;
+  }
+  .locked-banner{
+    display:none;
+    text-align:center;
+    font-weight:800;
+    letter-spacing:2px;
+    color:#ff3b3b;
+    font-size:13px;
+    margin:6px 0 0;
+    animation:timerpulse 1s infinite;
+  }
+  .locked-banner.show{ display:block; }
+
+  .sudden-death-banner{
+    display:none;
+    text-align:center;
+    font-weight:800;
+    letter-spacing:1.5px;
+    color:#ff8a00;
+    font-size:13px;
+    margin:6px 0 0;
+    animation:timerpulse .8s infinite;
+  }
+  .sudden-death-banner.show{ display:block; }
+  .timer-time.suddendeath{ color:#ff8a00; text-shadow:0 0 24px rgba(255,138,0,0.6); animation:timerpulse .8s infinite; }
+
+  .tie-banner{
+    display:none;
+    text-align:center;
+    background:rgba(255,255,255,0.08);
+    border:1px solid rgba(255,255,255,0.25);
+    border-radius:16px;
+    padding:14px 16px;
+    max-width:380px;
+    margin:10px auto 0;
+  }
+  .tie-banner.show{ display:block; animation:winnerPop .5s cubic-bezier(.34,1.56,.64,1); }
+  .tie-title{
+    font-size:18px; font-weight:800; letter-spacing:1px; margin-bottom:10px;
+    color:var(--gold); text-shadow:0 0 16px rgba(255,215,0,0.5);
+  }
+  .tie-actions{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+  .tie-sub{ font-size:11px; color:rgba(255,255,255,0.5); margin-top:8px; }
+
+  .sudden-death-badge{
+    display:none;
+    text-align:center;
+    font-size:clamp(18px,5.5vw,28px);
+    font-weight:900;
+    letter-spacing:3px;
+    color:var(--gold);
+    text-shadow:0 0 20px rgba(255,215,0,0.6);
+    margin:8px 0 0;
+  }
+  .sudden-death-badge.show{ display:block; animation:timerpulse .8s infinite; }
+
+  #flashOverlay{
+    position:fixed; inset:0;
+    pointer-events:none;
+    z-index:9999;
+    opacity:0;
+    background:radial-gradient(circle, rgba(255,20,20,0.6), rgba(255,20,20,0.15));
+  }
+  #flashOverlay.active{
+    animation:screenFlash 0.6s steps(1) infinite;
+  }
+  @keyframes screenFlash{
+    0%,100%{ opacity:0; }
+    50%{ opacity:1; }
+  }
+
+  /* WINNER CELEBRATION */
+  .winner-overlay{
+    position:fixed; inset:0;
+    z-index:9998;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    background:rgba(0,0,0,0.55);
+    backdrop-filter:blur(4px);
+    cursor:pointer;
+    padding:20px;
+  }
+  .winner-overlay.show{ display:flex; animation:winnerFadeIn .4s ease; }
+  @keyframes winnerFadeIn{ from{opacity:0;} to{opacity:1;} }
+  .winner-card{
+    text-align:center;
+    padding:34px 44px;
+    border-radius:24px;
+    background:linear-gradient(160deg, rgba(255,255,255,0.16), rgba(255,255,255,0.04));
+    border:2px solid rgba(255,255,255,0.35);
+    box-shadow:0 20px 60px rgba(0,0,0,0.55);
+    animation:winnerPop .6s cubic-bezier(.34,1.56,.64,1);
+    max-width:90vw;
+  }
+  @keyframes winnerPop{
+    0%{ transform:scale(0.3) rotate(-8deg); opacity:0; }
+    60%{ transform:scale(1.1) rotate(3deg); opacity:1; }
+    100%{ transform:scale(1) rotate(0deg); }
+  }
+  .winner-trophy{ font-size:clamp(48px,14vw,72px); margin-bottom:4px; animation:trophyBounce 1s ease-in-out infinite; }
+  @keyframes trophyBounce{ 0%,100%{transform:translateY(0);} 50%{transform:translateY(-12px);} }
+  .winner-title{
+    font-size:clamp(24px,7vw,42px);
+    font-weight:900;
+    letter-spacing:2px;
+    text-transform:uppercase;
+    margin:6px 0;
+    color:var(--gold);
+    text-shadow:0 0 30px rgba(255,215,0,0.6);
+    word-break:break-word;
+  }
+  .winner-score{
+    font-size:clamp(16px,4vw,22px);
+    color:rgba(255,255,255,0.85);
+    margin-top:6px;
+    font-weight:700;
+  }
+  .winner-sub{ font-size:12px; letter-spacing:1px; color:rgba(255,255,255,0.55); margin-top:14px; }
+
+  /* TIE / SUDDEN DEATH */
+  .tie-overlay{
+    position:fixed; inset:0;
+    z-index:9997;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    background:rgba(0,0,0,0.6);
+    backdrop-filter:blur(4px);
+    padding:20px;
+  }
+  .tie-overlay.show{ display:flex; animation:winnerFadeIn .4s ease; }
+  .tie-card{
+    text-align:center;
+    padding:30px 36px;
+    border-radius:24px;
+    background:linear-gradient(160deg, rgba(255,255,255,0.16), rgba(255,255,255,0.04));
+    border:2px solid rgba(255,255,255,0.35);
+    box-shadow:0 20px 60px rgba(0,0,0,0.55);
+    animation:winnerPop .5s cubic-bezier(.34,1.56,.64,1);
+    max-width:90vw;
+  }
+  .tie-icon{ font-size:clamp(40px,12vw,60px); margin-bottom:4px; }
+  .tie-title{
+    font-size:clamp(22px,6vw,34px);
+    font-weight:900;
+    letter-spacing:2px;
+    text-transform:uppercase;
+    color:#ffd166;
+    text-shadow:0 0 24px rgba(255,209,102,0.5);
+  }
+  .tie-score{ font-size:clamp(15px,3.6vw,20px); color:rgba(255,255,255,0.85); margin:8px 0 18px; font-weight:700; }
+  .tie-buttons{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+  .tie-btn{ font-size:13px; padding:10px 16px; }
+
+  .arena{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:12px;
+    max-width:900px;
+    margin:16px auto 0;
+    align-items:start;
+  }
+  @media (max-width:480px){
+    .arena{gap:8px;}
+  }
+
+  .team-panel{
+    background:rgba(255,255,255,0.06);
+    border-radius:20px;
+    padding:14px 10px 20px;
+    backdrop-filter:blur(10px);
+    border:1px solid rgba(255,255,255,0.12);
+    position:relative;
+    overflow:hidden;
+    box-shadow:0 8px 30px rgba(0,0,0,0.35);
+    transition:box-shadow .3s;
+  }
+  .team-panel.t1{ box-shadow:0 8px 30px rgba(0,114,255,0.25), inset 0 0 0 1px rgba(0,198,255,0.15);}
+  .team-panel.t2{ box-shadow:0 8px 30px rgba(221,36,118,0.25), inset 0 0 0 1px rgba(255,81,47,0.15);}
+  .team-panel::before{
+    content:"";
+    position:absolute; top:-40%; left:-40%;
+    width:180%; height:180%;
+    background:radial-gradient(circle at 30% 20%, rgba(255,255,255,0.10), transparent 60%);
+    pointer-events:none;
+  }
+  .team-panel.leading{
+    animation:leadpulse 1.8s ease-in-out infinite;
+  }
+  @keyframes leadpulse{
+    0%,100%{ filter:brightness(1); }
+    50%{ filter:brightness(1.18); }
+  }
+
+  .team-name-input{
+    width:100%;
+    text-align:center;
+    background:transparent;
+    border:none;
+    border-bottom:2px solid rgba(255,255,255,0.3);
+    color:#fff;
+    font-size:clamp(15px,4.2vw,22px);
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    padding:6px 4px 8px;
+    outline:none;
+    transition:border-color .2s;
+  }
+  .t1 .team-name-input:focus{border-color:var(--t1-a);}
+  .t2 .team-name-input:focus{border-color:var(--t2-a);}
+  .team-name-input::placeholder{color:rgba(255,255,255,0.45);}
+
+  .photo-frame{
+    margin:12px auto 4px;
+    width:min(140px,42vw);
+    height:min(140px,42vw);
+    border-radius:50%;
+    border:4px solid rgba(255,255,255,0.25);
+    background:rgba(255,255,255,0.06);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    position:relative;
+    overflow:hidden;
+    transition:transform .25s, border-color .25s;
+  }
+  .t1 .photo-frame{box-shadow:0 0 0 4px rgba(0,198,255,0.15), 0 6px 18px rgba(0,0,0,0.4);}
+  .t2 .photo-frame{box-shadow:0 0 0 4px rgba(255,81,47,0.15), 0 6px 18px rgba(0,0,0,0.4);}
+  .photo-frame:hover{transform:scale(1.04);}
+  .photo-frame:active{transform:scale(0.97);}
+  .photo-frame img{width:100%;height:100%;object-fit:cover;display:block;}
+  .photo-frame .plus-icon{
+    font-size:34px;
+    color:rgba(255,255,255,0.55);
+    line-height:1;
+    font-weight:200;
+  }
+  .photo-frame input[type=file]{display:none;}
+  .photo-hint{
+    text-align:center;
+    font-size:11px;
+    color:rgba(255,255,255,0.45);
+    margin-bottom:6px;
+  }
+
+  /* FLIP SCORE */
+  .score-wrap{
+    display:flex;
+    justify-content:center;
+    margin:14px 0 8px;
+    perspective:1000px;
+  }
+  .flip-card{
+    position:relative;
+    width:clamp(90px,26vw,150px);
+    height:clamp(90px,26vw,150px);
+    transform-style:preserve-3d;
+    transition:transform .55s cubic-bezier(.45,.05,.55,.95);
+  }
+  .flip-card.spin{ transform:rotateX(180deg); }
+  .flip-face{
+    position:absolute;
+    inset:0;
+    backface-visibility:hidden;
+    -webkit-backface-visibility:hidden;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:16px;
+    font-size:clamp(38px,11vw,64px);
+    font-weight:800;
+    background:linear-gradient(160deg,rgba(255,255,255,0.14),rgba(255,255,255,0.03));
+    border:1px solid rgba(255,255,255,0.25);
+    box-shadow:0 10px 25px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.3);
+  }
+  .flip-face.back{ transform:rotateX(180deg); }
+  .t1 .flip-face{ color:var(--t1-a); text-shadow:0 0 18px rgba(0,198,255,0.6); }
+  .t2 .flip-face{ color:var(--t2-a); text-shadow:0 0 18px rgba(255,81,47,0.6); }
+  .flip-card::after{
+    content:"";
+    position:absolute; left:6%; right:6%; top:50%;
+    height:2px;
+    background:rgba(0,0,0,0.35);
+    transform:translateY(-1px);
+    z-index:2;
+  }
+
+  /* 3D POINT BUTTON */
+  .point-btn{
+    display:block;
+    margin:16px auto 6px;
+    width:min(150px,60vw);
+    padding:16px 0;
+    border:none;
+    border-radius:50px;
+    font-size:16px;
+    font-weight:800;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:#fff;
+    cursor:pointer;
+    position:relative;
+    transform:translateY(0);
+    transition:transform .09s ease, box-shadow .09s ease;
+  }
+  .t1 .point-btn{
+    background:linear-gradient(180deg,var(--t1-a),var(--t1-b));
+    box-shadow:0 8px 0 #004fa8, 0 14px 22px rgba(0,114,255,0.45);
+  }
+  .t2 .point-btn{
+    background:linear-gradient(180deg,var(--t2-a),var(--t2-b));
+    box-shadow:0 8px 0 #9c0f47, 0 14px 22px rgba(221,36,118,0.45);
+  }
+  .t1 .point-btn:active{ transform:translateY(8px); box-shadow:0 0 0 #004fa8, 0 4px 10px rgba(0,114,255,0.4); }
+  .t2 .point-btn:active{ transform:translateY(8px); box-shadow:0 0 0 #9c0f47, 0 4px 10px rgba(221,36,118,0.4); }
+  .point-btn .plus{
+    display:inline-block;
+    font-size:20px;
+    margin-right:4px;
+  }
+  .point-btn.pop{ animation:pop .35s ease; }
+  .point-btn:disabled{ opacity:0.35; cursor:not-allowed; filter:grayscale(0.5); box-shadow:none !important; transform:none !important; }
+  @keyframes pop{
+    0%{ transform:scale(1) translateY(0); }
+    35%{ transform:scale(1.12) translateY(0); }
+    100%{ transform:scale(1) translateY(0); }
+  }
+
+  .minus-btn{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin:10px auto 0;
+    width:38px;
+    height:38px;
+    border:none;
+    border-radius:50%;
+    font-size:18px;
+    font-weight:800;
+    color:#fff;
+    cursor:pointer;
+    background:linear-gradient(180deg,rgba(255,255,255,0.22),rgba(255,255,255,0.08));
+    box-shadow:0 4px 0 rgba(0,0,0,0.35), 0 8px 14px rgba(0,0,0,0.3);
+    transform:translateY(0);
+    transition:transform .08s ease, box-shadow .08s ease;
+  }
+  .minus-btn:active{
+    transform:translateY(4px);
+    box-shadow:0 0 0 rgba(0,0,0,0.35), 0 3px 6px rgba(0,0,0,0.25);
+  }
+  .minus-btn:disabled{
+    opacity:0.3;
+    cursor:default;
+  }
+
+  .vs-badge{
+    text-align:center;
+    font-size:12px;
+    letter-spacing:4px;
+    color:rgba(255,255,255,0.35);
+    margin:10px 0 -2px;
+  }
+
+  footer{
+    text-align:center;
+    font-size:11px;
+    color:rgba(255,255,255,0.3);
+    margin-top:28px;
+    padding-bottom:16px;
+  }
+
+  /* confetti */
+  .confetti{
+    position:fixed; top:-10px; pointer-events:none; border-radius:2px; z-index:999;
+    animation:fall linear forwards;
+  }
+  @keyframes fall{
+    to{ transform:translateY(110vh) rotate(540deg); opacity:0.2; }
+  }
+
+  /* ===== LAYOUT 2 : SIDE OM SIDE ===== */
+  body.layout-2 .team-panel{
+    display:grid;
+    grid-template-columns:auto 1fr;
+    grid-template-rows:auto auto auto auto;
+    align-items:center;
+    column-gap:14px;
+    row-gap:6px;
+  }
+  body.layout-2 .team-name-input{ grid-column:2; grid-row:1; text-align:left; font-size:clamp(14px,3.6vw,19px); }
+  body.layout-2 .photo-frame{ grid-column:1; grid-row:1/5; width:min(90px,24vw); height:min(90px,24vw); margin:0; }
+  body.layout-2 .photo-hint{ display:none; }
+  body.layout-2 .score-wrap{ grid-column:2; grid-row:2; justify-content:flex-start; margin:4px 0; }
+  body.layout-2 .flip-card{ width:min(80px,22vw); height:min(80px,22vw); }
+  body.layout-2 .flip-face{ font-size:min(36px,9vw); border-radius:10px; }
+  body.layout-2 .point-btn{ grid-column:2; grid-row:3; margin:2px 0; width:min(160px,40vw); padding:10px 0; font-size:13px; }
+  body.layout-2 .minus-btn{ grid-column:2; grid-row:4; margin:0; }
+
+  /* ===== LAYOUT 3 : STORT TAL ===== */
+  body.layout-3 .photo-frame{ display:none; }
+  body.layout-3 .photo-hint{ display:none; }
+  body.layout-3 .team-name-input{ font-size:clamp(13px,3.4vw,18px); opacity:0.85; margin-top:4px; }
+  body.layout-3 .flip-card{ width:min(220px,52vw); height:min(220px,52vw); }
+  body.layout-3 .flip-face{ font-size:min(96px,22vw); }
+  body.layout-3 .score-wrap{ margin:10px 0 4px; }
+
+  /* ===== SETTINGS PAGE ===== */
+  .settings-header{
+    display:flex; justify-content:space-between; align-items:center;
+    max-width:640px; margin:4px auto 16px; padding:2px 6px;
+    flex-wrap:wrap; gap:10px;
+  }
+  .settings-header h2{ margin:0; font-size:20px; letter-spacing:1px; }
+  .settings-section{
+    background:rgba(255,255,255,0.06);
+    border:1px solid rgba(255,255,255,0.12);
+    border-radius:16px;
+    padding:16px 18px;
+    margin:0 auto 14px;
+    max-width:640px;
+  }
+  .settings-section h3{
+    margin:0 0 12px;
+    font-size:13px;
+    letter-spacing:1.5px;
+    text-transform:uppercase;
+    color:rgba(255,255,255,0.6);
+  }
+  .theme-row{ display:flex; gap:12px; flex-wrap:wrap; }
+  .theme-swatch{
+    width:44px; height:44px; border-radius:50%;
+    border:3px solid rgba(255,255,255,0.15);
+    cursor:pointer;
+  }
+  .theme-swatch.active{ border-color:#fff; box-shadow:0 0 0 3px rgba(255,255,255,0.3); }
+
+  .layout-row{ display:flex; gap:12px; flex-wrap:wrap; }
+  .layout-option{
+    flex:1; min-width:110px;
+    background:rgba(255,255,255,0.05);
+    border:2px solid rgba(255,255,255,0.15);
+    border-radius:12px;
+    padding:10px;
+    color:#fff;
+    font-size:12px;
+    cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; gap:8px;
+  }
+  .layout-option.active{ border-color:var(--t1-a); background:rgba(255,255,255,0.12); }
+  .layout-preview{ width:100%; height:44px; border-radius:6px; background:rgba(255,255,255,0.1); position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center; gap:4px; }
+  .lp-dot{ width:14px; height:14px; border-radius:50%; background:rgba(255,255,255,0.4); }
+  .lp-bar{ width:22px; height:10px; border-radius:3px; background:rgba(255,255,255,0.4); }
+  .lp-big{ width:26px; height:26px; border-radius:4px; background:rgba(255,255,255,0.5); }
+
+  .switch-row{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; font-size:14px; }
+  .switch{ position:relative; display:inline-block; width:46px; height:26px; flex-shrink:0; }
+  .switch input{ opacity:0; width:0; height:0; }
+  .slider-toggle{ position:absolute; cursor:pointer; inset:0; background:rgba(255,255,255,0.2); border-radius:26px; transition:.2s; }
+  .slider-toggle::before{ content:""; position:absolute; height:20px; width:20px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.2s; }
+  .switch input:checked + .slider-toggle{ background:linear-gradient(90deg,var(--t1-a),var(--t2-a)); }
+  .switch input:checked + .slider-toggle::before{ transform:translateX(20px); }
+
+  .time-inputs{ display:none; gap:18px; }
+  .time-inputs label{ display:flex; flex-direction:column; font-size:11px; gap:4px; color:rgba(255,255,255,0.7); letter-spacing:0.5px; text-transform:uppercase; }
+  .time-inputs input{ width:72px; padding:9px; border-radius:8px; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.08); color:#fff; font-size:17px; text-align:center; }
+
+  .sound-row{ display:flex; gap:10px; flex-wrap:wrap; }
+  .sound-option{
+    background:rgba(255,255,255,0.06);
+    border:2px solid rgba(255,255,255,0.15);
+    border-radius:10px;
+    padding:10px 14px;
+    color:#fff;
+    font-size:13px;
+    cursor:pointer;
+    display:flex; align-items:center; gap:8px;
+  }
+  .sound-option.active{ border-color:var(--t1-a); background:rgba(255,255,255,0.14); }
+  .custom-sound-name{ font-size:12px; color:rgba(255,255,255,0.5); margin-top:10px; }
+
+  .no-saved-teams{ font-size:12px; color:rgba(255,255,255,0.4); }
+
+  .saved-team-row{ display:flex; flex-wrap:wrap; gap:10px; }
+  .saved-team-card{
+    display:flex; align-items:center; gap:8px;
+    background:rgba(255,255,255,0.06);
+    border:1px solid rgba(255,255,255,0.15);
+    border-radius:12px;
+    padding:8px 10px;
+  }
+  .saved-team-thumb{
+    width:36px; height:36px; border-radius:50%; overflow:hidden;
+    background:rgba(255,255,255,0.12);
+    display:flex; align-items:center; justify-content:center; font-size:16px;
+    flex-shrink:0;
+  }
+  .saved-team-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .saved-team-name{ font-size:13px; font-weight:600; max-width:110px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .saved-team-actions{ display:flex; gap:4px; margin-left:auto; flex-wrap:wrap; }
+  .saved-team-actions button{
+    background:rgba(255,255,255,0.14); border:none; color:#fff; border-radius:8px; padding:5px 8px; font-size:11px; cursor:pointer;
+  }
+  .saved-team-actions button.del{ background:rgba(255,60,60,0.28); }
+
+  .save-team-btn{
+    display:block;
+    margin:6px auto 0;
+    font-size:11px;
+    background:rgba(255,255,255,0.08);
+    border:1px solid rgba(255,255,255,0.2);
+    color:rgba(255,255,255,0.8);
+    padding:5px 10px;
+    border-radius:20px;
+    cursor:pointer;
+  }
+  .save-team-btn:active{ transform:scale(0.95); }
+
+  /* PRINT SHEET (hidden on screen) */
+  #printSheet{ display:none; }
+
+  @media print{
+    body *{ visibility:hidden; }
+    body{ background:#fff !important; animation:none; overflow:visible; }
+    #printSheet, #printSheet *{ visibility:visible; }
+    #printSheet{
+      display:block;
+      position:absolute; top:0; left:0;
+      width:210mm; min-height:297mm;
+      padding:15mm;
+      color:#111;
+      font-family:'Segoe UI',sans-serif;
+    }
+    .p-title{
+      text-align:center;
+      font-size:26px;
+      font-weight:800;
+      letter-spacing:4px;
+      text-transform:uppercase;
+      color:#222;
+      margin-bottom:4px;
+    }
+    .p-date{
+      text-align:center;
+      font-size:12px;
+      color:#777;
+      margin-bottom:30px;
+    }
+    .p-arena{
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      gap:30px;
+    }
+    .p-team{
+      flex:1;
+      text-align:center;
+      max-width:260px;
+    }
+    .p-photo{
+      width:170px; height:170px;
+      border-radius:50%;
+      object-fit:cover;
+      margin:0 auto 16px;
+      border:6px solid #222;
+      display:block;
+    }
+    .p-photo.placeholder{
+      background:#eee;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:#aaa;
+      font-size:13px;
+    }
+    .p-name{
+      font-size:20px;
+      font-weight:800;
+      text-transform:uppercase;
+      letter-spacing:1px;
+      margin-bottom:10px;
+      word-break:break-word;
+    }
+    .p-score{
+      font-size:80px;
+      font-weight:900;
+      line-height:1;
+    }
+    .p-team.winner .p-score{ color:#0a7d2c; }
+    .p-team.winner .p-name::after{
+      content:" 🏆";
+    }
+    .p-vs{
+      font-size:28px;
+      font-weight:800;
+      color:#999;
+      padding:0 6px;
+    }
+    .p-footer{
+      text-align:center;
+      margin-top:60px;
+      font-size:11px;
+      color:#999;
+      border-top:1px solid #ddd;
+      padding-top:14px;
+    }
+    .p-result-line{
+      text-align:center;
+      margin-top:34px;
+      font-size:15px;
+      color:#333;
+    }
+  }
+
+  /* TABLET LANDSCAPE (tablet lying flat, horizontally) */
+  @media (orientation:landscape) and (min-width:700px){
+    header{ padding:2px 0 4px; }
+    header h1{ font-size:clamp(18px,2.4vh,26px); letter-spacing:2px; }
+    .toolbar{ margin-top:4px; }
+    .tool-btn{ padding:6px 14px; font-size:12px; }
+    .vs-badge{ margin:4px 0 2px; font-size:11px; }
+    .timer-display{ margin:4px 0 0; }
+    .timer-time{ font-size:clamp(22px,5vh,34px); }
+
+    .arena{
+      max-width:1400px;
+      width:100%;
+      margin:6px auto 0;
+      gap:20px;
+    }
+
+    body:not(.layout-2):not(.layout-3) .team-panel{
+      display:grid;
+      grid-template-columns:auto 1fr;
+      grid-template-rows:auto auto auto auto;
+      align-items:center;
+      column-gap:min(4vw,26px);
+      row-gap:6px;
+      padding:10px 16px;
+    }
+    body:not(.layout-2):not(.layout-3) .team-name-input{
+      grid-column:2; grid-row:1; text-align:left;
+      font-size:clamp(15px,2.6vh,22px); padding:4px 2px 6px;
+    }
+    body:not(.layout-2):not(.layout-3) .photo-frame{
+      grid-column:1; grid-row:1 / 5;
+      width:min(18vh,140px); height:min(18vh,140px); margin:0;
+    }
+    body:not(.layout-2):not(.layout-3) .photo-hint{ display:none; }
+    body:not(.layout-2):not(.layout-3) .score-wrap{
+      grid-column:2; grid-row:2; justify-content:flex-start; margin:4px 0;
+    }
+    body:not(.layout-2):not(.layout-3) .flip-card{ width:min(18vh,140px); height:min(18vh,140px); }
+    body:not(.layout-2):not(.layout-3) .flip-face{ font-size:min(8vh,58px); border-radius:14px; }
+    body:not(.layout-2):not(.layout-3) .point-btn{
+      grid-column:2; grid-row:3; margin:2px 0; width:min(220px,26vw); padding:min(1.6vh,14px) 0; font-size:clamp(13px,1.8vh,16px);
+    }
+    body:not(.layout-2):not(.layout-3) .minus-btn{ grid-column:2; grid-row:4; margin:0; width:min(5.5vh,36px); height:min(5.5vh,36px); }
+
+    footer{ display:none; }
+  }
+</style>
+</head>
+<body class="layout-1">
+
+<div id="flashOverlay"></div>
+
+<div class="winner-overlay" id="winnerOverlay">
+  <div class="winner-card">
+    <div class="winner-trophy">🏆</div>
+    <div class="winner-title" id="winnerTitle">Hold 1 VINDER!</div>
+    <div class="winner-score" id="winnerScoreLine"></div>
+    <div class="winner-sub">tryk hvor som helst for at lukke</div>
+  </div>
+</div>
+
+<div class="tie-overlay" id="tieOverlay">
+  <div class="tie-card">
+    <div class="tie-icon">⚖️</div>
+    <div class="tie-title">Uafgjort!</div>
+    <div class="tie-score" id="tieScoreLine"></div>
+    <div class="tie-buttons">
+      <button class="tool-btn tie-btn" id="suddenDeathBtn">🔥 Sudden Death</button>
+      <button class="tool-btn tie-btn" id="extraTimeBtn">⏱ Forlænget tid</button>
+    </div>
+  </div>
+</div>
+
+<div class="flip-container" id="flipContainer">
+  <div class="flip-inner" id="flipInner">
+
+    <div class="page page-front" id="pageFront">
+      <header>
+        <h1>🏆 Scoreboard</h1>
+        <div class="toolbar">
+          <button class="tool-btn" id="resetBtn">↺ Nulstil</button>
+          <button class="tool-btn" id="printBtn">🖨 Udskriv resultat</button>
+          <button class="tool-btn" id="settingsBtn">⚙ Indstillinger</button>
+          <button class="tool-btn" id="fullscreenBtn">⛶ Fuld skærm</button>
+        </div>
+        <div class="swipe-hint">👉 Slide til siden for farver, layout &amp; tid 👈</div>
+      </header>
+
+      <div class="timer-display" id="timerDisplay">
+        <div class="timer-time" id="timerTime">10:00</div>
+        <div class="timer-controls">
+          <button class="tool-btn" id="timerStartBtn">▶ Start</button>
+          <button class="tool-btn" id="timerResetBtn">↺ Nulstil tid</button>
+        </div>
+      </div>
+      <div class="locked-banner" id="lockedBanner">⏰ TIDEN ER GÅET – SCORING LÅST</div>
+      <div class="sudden-death-banner" id="suddenDeathBanner">🔥 SUDDEN DEATH – NÆSTE POINT VINDER!</div>
+
+      <div class="vs-badge">— KAMP —</div>
+
+      <div class="arena">
+        <div class="team-panel t1" id="panel1">
+          <input type="text" class="team-name-input" id="name1" placeholder="Hold 1 navn" maxlength="24">
+          <label class="photo-frame" id="frame1">
+            <span class="plus-icon">📷</span>
+            <input type="file" accept="image/*" id="photo1">
+          </label>
+          <div class="photo-hint">Tryk for billede</div>
+          <button class="save-team-btn" id="saveTeam1">💾 Gem hold</button>
+
+          <div class="score-wrap">
+            <div class="flip-card" id="flip1">
+              <div class="flip-face front" id="face1front">0</div>
+              <div class="flip-face back" id="face1back">0</div>
+            </div>
+          </div>
+
+          <button class="point-btn" id="btn1"><span class="plus">+</span>1 POINT</button>
+          <button class="minus-btn" id="minus1" title="Træk 1 point fra">−1</button>
+        </div>
+
+        <div class="team-panel t2" id="panel2">
+          <input type="text" class="team-name-input" id="name2" placeholder="Hold 2 navn" maxlength="24">
+          <label class="photo-frame" id="frame2">
+            <span class="plus-icon">📷</span>
+            <input type="file" accept="image/*" id="photo2">
+          </label>
+          <div class="photo-hint">Tryk for billede</div>
+          <button class="save-team-btn" id="saveTeam2">💾 Gem hold</button>
+
+          <div class="score-wrap">
+            <div class="flip-card" id="flip2">
+              <div class="flip-face front" id="face2front">0</div>
+              <div class="flip-face back" id="face2back">0</div>
+            </div>
+          </div>
+
+          <button class="point-btn" id="btn2"><span class="plus">+</span>1 POINT</button>
+          <button class="minus-btn" id="minus2" title="Træk 1 point fra">−1</button>
+        </div>
+      </div>
+
+      <footer>Lavet til dig · tryk på billederne for at tilføje hold-fotos</footer>
+    </div>
+
+    <div class="page page-back" id="pageBack">
+      <div class="settings-header">
+        <h2>⚙ Indstillinger</h2>
+        <button class="tool-btn" id="backBtn">→ Tilbage til bane</button>
+      </div>
+
+      <section class="settings-section">
+        <h3>Farvetema</h3>
+        <div class="theme-row" id="themeRow"></div>
+      </section>
+
+      <section class="settings-section">
+        <h3>Layout</h3>
+        <div class="layout-row" id="layoutRow">
+          <button class="layout-option" data-layout="1">
+            <div class="layout-preview"><span class="lp-dot"></span><span class="lp-dot"></span></div>
+            Klassisk
+          </button>
+          <button class="layout-option" data-layout="2">
+            <div class="layout-preview"><span class="lp-dot"></span><span class="lp-bar"></span></div>
+            Side om side
+          </button>
+          <button class="layout-option" data-layout="3">
+            <div class="layout-preview"><span class="lp-big"></span></div>
+            Stort tal
+          </button>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h3>Gemte hold</h3>
+        <div class="saved-team-row" id="savedTeamRow"></div>
+      </section>
+
+      <section class="settings-section">
+        <h3>Kamptid</h3>
+        <div class="switch-row">
+          <span>Aktivér nedtælling</span>
+          <label class="switch"><input type="checkbox" id="timerEnableCk"><span class="slider-toggle"></span></label>
+        </div>
+        <div class="time-inputs" id="timeInputsRow">
+          <label>Minutter <input type="number" id="timerMin" min="0" max="180" value="10"></label>
+          <label>Sekunder <input type="number" id="timerSec" min="0" max="59" value="0"></label>
+        </div>
+        <div class="time-inputs" id="extraTimeInputsRow" style="margin-top:12px;">
+          <label>Forlænget tid – min <input type="number" id="extraMin" min="0" max="30" value="2"></label>
+          <label>Forlænget tid – sek <input type="number" id="extraSec" min="0" max="59" value="0"></label>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h3>Lyd når tiden er gået</h3>
+        <div class="sound-row">
+          <button class="sound-option" data-sound="whistle">🔔 Fløjt</button>
+          <button class="sound-option" data-sound="siren">🚨 Sirene</button>
+          <button class="sound-option" data-sound="bell">🔊 Klokke</button>
+          <button class="sound-option" data-sound="custom">📁 Egen lydfil</button>
+        </div>
+        <input type="file" id="customSoundFile" accept="audio/*" style="display:none">
+        <div class="custom-sound-name" id="customSoundName"></div>
+      </section>
+    </div>
+
+  </div>
+</div>
+
+<!-- PRINT LAYOUT -->
+<div id="printSheet">
+  <div class="p-title">Kampresultat</div>
+  <div class="p-date" id="pDate"></div>
+  <div class="p-arena">
+    <div class="p-team" id="pTeam1">
+      <img class="p-photo placeholder" id="pPhoto1" alt="">
+      <div class="p-name" id="pName1">Hold 1</div>
+      <div class="p-score" id="pScore1">0</div>
+    </div>
+    <div class="p-vs">VS</div>
+    <div class="p-team" id="pTeam2">
+      <img class="p-photo placeholder" id="pPhoto2" alt="">
+      <div class="p-name" id="pName2">Hold 2</div>
+      <div class="p-score" id="pScore2">0</div>
+    </div>
+  </div>
+  <div class="p-result-line" id="pResultLine"></div>
+  <div class="p-footer">Genereret automatisk · Scoreboard</div>
+</div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+
+  /* ---------- SCORE STATE ---------- */
+  const state = {
+    name1: localStorage.getItem('sb_name1') || '',
+    name2: localStorage.getItem('sb_name2') || '',
+    photo1: localStorage.getItem('sb_photo1') || '',
+    photo2: localStorage.getItem('sb_photo2') || '',
+    score1: parseInt(localStorage.getItem('sb_score1') || '0', 10),
+    score2: parseInt(localStorage.getItem('sb_score2') || '0', 10),
+  };
+
+  let locked = false;
+
+  const name1 = $('name1'), name2 = $('name2');
+  const frame1 = $('frame1'), frame2 = $('frame2');
+  const photo1 = $('photo1'), photo2 = $('photo2');
+  const btn1 = $('btn1'), btn2 = $('btn2');
+  const minus1 = $('minus1'), minus2 = $('minus2');
+  const panel1 = $('panel1'), panel2 = $('panel2');
+  const flip1 = $('flip1'), flip2 = $('flip2');
+  const face1front = $('face1front'), face1back = $('face1back');
+  const face2front = $('face2front'), face2back = $('face2back');
+
+  name1.value = state.name1;
+  name2.value = state.name2;
+  face1front.textContent = state.score1;
+  face2front.textContent = state.score2;
+  if(state.photo1) setPhoto(frame1, state.photo1);
+  if(state.photo2) setPhoto(frame2, state.photo2);
+
+  function setPhoto(frame, dataUrl){
+    frame.innerHTML = '<img src="'+dataUrl+'">';
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = 'image/*';
+    input.style.display = 'none';
+    frame.appendChild(input);
+    input.addEventListener('change', e => handlePhotoChange(e, frame));
+  }
+
+  function compressImage(file, maxDim, quality, callback){
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        if(w > h){ if(w > maxDim){ h = Math.round(h*maxDim/w); w = maxDim; } }
+        else{ if(h > maxDim){ w = Math.round(w*maxDim/h); h = maxDim; } }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        callback(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => callback(ev.target.result); // fallback: brug original hvis komprimering fejler
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function safeSetItem(key, value){
+    try{
+      localStorage.setItem(key, value);
+      return true;
+    }catch(e){
+      alert('Der er ikke mere plads i telefonens lager til flere billeder. Slet evt. et gemt hold eller brug et mindre billede.');
+      return false;
+    }
+  }
+
+  function handlePhotoChange(e, frame){
+    const file = e.target.files[0];
+    if(!file) return;
+    compressImage(file, 380, 0.72, dataUrl => {
+      setPhoto(frame, dataUrl);
+      if(frame === frame1){ safeSetItem('sb_photo1', dataUrl); }
+      else{ safeSetItem('sb_photo2', dataUrl); }
+    });
+  }
+
+  photo1.addEventListener('change', e => handlePhotoChange(e, frame1));
+  photo2.addEventListener('change', e => handlePhotoChange(e, frame2));
+
+  name1.addEventListener('input', () => localStorage.setItem('sb_name1', name1.value));
+  name2.addEventListener('input', () => localStorage.setItem('sb_name2', name2.value));
+
+  /* ---------- GEMTE HOLD ---------- */
+  function getSavedTeams(){
+    try{ return JSON.parse(localStorage.getItem('sb_savedTeams') || '[]'); }
+    catch(e){ return []; }
+  }
+  function setSavedTeams(list){
+    try{
+      localStorage.setItem('sb_savedTeams', JSON.stringify(list));
+      return true;
+    }catch(e){
+      alert('Der er ikke mere plads i telefonens lager til flere gemte hold. Slet et gemt hold, eller gem uden billede.');
+      return false;
+    }
+  }
+  function renderSavedTeams(){
+    const row = $('savedTeamRow');
+    const teams = getSavedTeams();
+    row.innerHTML = '';
+    if(teams.length === 0){
+      row.innerHTML = '<div class="no-saved-teams">Ingen gemte hold endnu. Tryk "💾 Gem hold" under et hold på banen.</div>';
+      return;
+    }
+    teams.forEach(team => {
+      const card = document.createElement('div');
+      card.className = 'saved-team-card';
+
+      const thumb = document.createElement('div');
+      thumb.className = 'saved-team-thumb';
+      if(team.photo){
+        const img = document.createElement('img');
+        img.src = team.photo;
+        thumb.appendChild(img);
+      } else {
+        thumb.textContent = '🏳';
+      }
+
+      const nameEl = document.createElement('div');
+      nameEl.className = 'saved-team-name';
+      nameEl.textContent = team.name;
+
+      const actions = document.createElement('div');
+      actions.className = 'saved-team-actions';
+      const b1 = document.createElement('button'); b1.textContent = 'Hold 1';
+      b1.addEventListener('click', () => loadSavedTeam(team, 1));
+      const b2 = document.createElement('button'); b2.textContent = 'Hold 2';
+      b2.addEventListener('click', () => loadSavedTeam(team, 2));
+      const bd = document.createElement('button'); bd.textContent = '🗑'; bd.className = 'del';
+      bd.addEventListener('click', () => deleteSavedTeam(team.id));
+      actions.appendChild(b1); actions.appendChild(b2); actions.appendChild(bd);
+
+      card.appendChild(thumb); card.appendChild(nameEl); card.appendChild(actions);
+      row.appendChild(card);
+    });
+  }
+  function loadSavedTeam(team, slot){
+    if(slot === 1){
+      name1.value = team.name;
+      localStorage.setItem('sb_name1', team.name);
+      if(team.photo){ setPhoto(frame1, team.photo); localStorage.setItem('sb_photo1', team.photo); }
+    } else {
+      name2.value = team.name;
+      localStorage.setItem('sb_name2', team.name);
+      if(team.photo){ setPhoto(frame2, team.photo); localStorage.setItem('sb_photo2', team.photo); }
+    }
+  }
+  function deleteSavedTeam(id){
+    setSavedTeams(getSavedTeams().filter(t => t.id !== id));
+    renderSavedTeams();
+  }
+  function saveCurrentTeam(slot){
+    const name = (slot === 1 ? name1.value : name2.value).trim();
+    if(!name){ alert('Skriv et holdnavn først.'); return; }
+    const photo = localStorage.getItem(slot === 1 ? 'sb_photo1' : 'sb_photo2') || '';
+    const teams = getSavedTeams();
+    const existing = teams.find(t => t.name.toLowerCase() === name.toLowerCase());
+    if(existing){ existing.photo = photo; }
+    else{ teams.push({ id: Date.now().toString(36)+Math.random().toString(36).slice(2), name, photo }); }
+    setSavedTeams(teams);
+    renderSavedTeams();
+  }
+  $('saveTeam1').addEventListener('click', () => saveCurrentTeam(1));
+  $('saveTeam2').addEventListener('click', () => saveCurrentTeam(2));
+  renderSavedTeams();
+
+  function flipScore(flipEl, frontEl, backEl, newVal){
+    backEl.textContent = newVal;
+    flipEl.classList.add('spin');
+    setTimeout(() => {
+      frontEl.textContent = newVal;
+      flipEl.style.transition = 'none';
+      flipEl.classList.remove('spin');
+      void flipEl.offsetWidth;
+      flipEl.style.transition = '';
+    }, 560);
+  }
+
+  function addPoint(team){
+    if(team === 1){
+      state.score1++;
+      localStorage.setItem('sb_score1', state.score1);
+      flipScore(flip1, face1front, face1back, state.score1);
+      pulseBtn(btn1);
+      burstConfetti(btn1, 't1');
+    } else {
+      state.score2++;
+      localStorage.setItem('sb_score2', state.score2);
+      flipScore(flip2, face2front, face2back, state.score2);
+      pulseBtn(btn2);
+      burstConfetti(btn2, 't2');
+    }
+    updateLeader();
+    updateMinusButtons();
+    beep();
+    if(suddenDeathActive && state.score1 !== state.score2){
+      exitSuddenDeath();
+      lockScoring();
+      checkAndCelebrateWinner();
+    }
+  }
+
+  function removePoint(team){
+    if(team === 1 && state.score1 > 0){
+      state.score1--;
+      localStorage.setItem('sb_score1', state.score1);
+      flipScore(flip1, face1front, face1back, state.score1);
+    } else if(team === 2 && state.score2 > 0){
+      state.score2--;
+      localStorage.setItem('sb_score2', state.score2);
+      flipScore(flip2, face2front, face2back, state.score2);
+    }
+    updateLeader();
+    updateMinusButtons();
+  }
+
+  function pulseBtn(btn){
+    btn.classList.remove('pop');
+    void btn.offsetWidth;
+    btn.classList.add('pop');
+  }
+
+  function updateMinusButtons(){
+    minus1.disabled = state.score1 <= 0 || locked;
+    minus2.disabled = state.score2 <= 0 || locked;
+  }
+
+  function updateLeader(){
+    panel1.classList.remove('leading');
+    panel2.classList.remove('leading');
+    if(state.score1 > state.score2) panel1.classList.add('leading');
+    else if(state.score2 > state.score1) panel2.classList.add('leading');
+  }
+  updateLeader();
+  updateMinusButtons();
+
+  function burstConfetti(anchor, teamClass){
+    const rect = anchor.getBoundingClientRect();
+    const colors = teamClass === 't1' ? ['#00c6ff','#0072ff','#ffffff'] : ['#ff512f','#dd2476','#ffffff'];
+    for(let i=0;i<14;i++){
+      const c = document.createElement('div');
+      c.className = 'confetti';
+      const size = 5 + Math.random()*5;
+      c.style.width = size+'px';
+      c.style.height = (size*1.6)+'px';
+      c.style.background = colors[Math.floor(Math.random()*colors.length)];
+      c.style.left = (rect.left + rect.width/2 + (Math.random()*80-40)) + 'px';
+      c.style.top = (rect.top - 10) + 'px';
+      const duration = 900 + Math.random()*700;
+      c.style.animationDuration = duration+'ms';
+      document.body.appendChild(c);
+      setTimeout(() => c.remove(), duration+50);
+    }
+  }
+
+  let audioCtx;
+  function getCtx(){
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    return audioCtx;
+  }
+  function beep(){
+    try{
+      const ctx = getCtx();
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'triangle';
+      o.frequency.value = 660;
+      g.gain.value = 0.08;
+      o.connect(g); g.connect(ctx.destination);
+      o.start();
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+      o.stop(ctx.currentTime + 0.25);
+    }catch(e){}
+  }
+
+  btn1.addEventListener('click', () => addPoint(1));
+  btn2.addEventListener('click', () => addPoint(2));
+  minus1.addEventListener('click', () => removePoint(1));
+  minus2.addEventListener('click', () => removePoint(2));
+
+  $('resetBtn').addEventListener('click', () => {
+    if(!confirm('Nulstil hele kampen (navne, billeder og stilling)?')) return;
+    ['sb_name1','sb_name2','sb_photo1','sb_photo2','sb_score1','sb_score2'].forEach(k => localStorage.removeItem(k));
+    location.reload();
+  });
+
+  $('printBtn').addEventListener('click', () => {
+    $('pName1').textContent = name1.value.trim() || 'Hold 1';
+    $('pName2').textContent = name2.value.trim() || 'Hold 2';
+    $('pScore1').textContent = state.score1;
+    $('pScore2').textContent = state.score2;
+
+    const pPhoto1 = $('pPhoto1'), pPhoto2 = $('pPhoto2');
+    const photo1Data = localStorage.getItem('sb_photo1');
+    const photo2Data = localStorage.getItem('sb_photo2');
+    if(photo1Data){ pPhoto1.src = photo1Data; pPhoto1.classList.remove('placeholder'); }
+    else { pPhoto1.removeAttribute('src'); pPhoto1.classList.add('placeholder'); }
+    if(photo2Data){ pPhoto2.src = photo2Data; pPhoto2.classList.remove('placeholder'); }
+    else { pPhoto2.removeAttribute('src'); pPhoto2.classList.add('placeholder'); }
+
+    $('pTeam1').classList.remove('winner');
+    $('pTeam2').classList.remove('winner');
+    let resultLine = '';
+    if(state.score1 > state.score2){
+      $('pTeam1').classList.add('winner');
+      resultLine = (name1.value.trim() || 'Hold 1') + ' vinder kampen!';
+    } else if(state.score2 > state.score1){
+      $('pTeam2').classList.add('winner');
+      resultLine = (name2.value.trim() || 'Hold 2') + ' vinder kampen!';
+    } else {
+      resultLine = 'Kampen endte uafgjort.';
+    }
+    $('pResultLine').textContent = resultLine;
+
+    const now = new Date();
+    $('pDate').textContent = now.toLocaleDateString('da-DK', { weekday:'long', year:'numeric', month:'long', day:'numeric' }) + ' · ' + now.toLocaleTimeString('da-DK', {hour:'2-digit', minute:'2-digit'});
+
+    window.print();
+  });
+
+  /* ---------- FLIP TO SETTINGS PAGE (SWIPE) ---------- */
+  const flipContainer = $('flipContainer');
+  const flipInner = $('flipInner');
+
+  function toggleFlip(){
+    flipInner.classList.toggle('flipped');
+  }
+  $('settingsBtn').addEventListener('click', toggleFlip);
+  $('backBtn').addEventListener('click', toggleFlip);
+
+  /* ---------- FULD SKÆRM ---------- */
+  const fullscreenBtn = $('fullscreenBtn');
+  function isFullscreen(){
+    return !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+  }
+  function updateFullscreenBtn(){
+    fullscreenBtn.textContent = isFullscreen() ? '⛶ Afslut fuld skærm' : '⛶ Fuld skærm';
+  }
+  fullscreenBtn.addEventListener('click', () => {
+    const el = document.documentElement;
+    if(!isFullscreen()){
+      const req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+      if(req){ req.call(el).catch(() => {}); }
+    } else {
+      const exit = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
+      if(exit){ exit.call(document); }
+    }
+  });
+  ['fullscreenchange','webkitfullscreenchange','mozfullscreenchange','MSFullscreenChange'].forEach(evt => {
+    document.addEventListener(evt, updateFullscreenBtn);
+  });
+
+  /* ---------- SERVICE WORKER (offline-understøttelse) ---------- */
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('service-worker.js').catch(() => {});
+    });
+  }
+
+  let touchStartX=0, touchStartY=0, touchStartTime=0, tracking=false;
+  function swipeStart(x,y){ touchStartX=x; touchStartY=y; touchStartTime=Date.now(); tracking=true; }
+  function swipeEnd(x,y){
+    if(!tracking) return;
+    tracking=false;
+    const dx = x - touchStartX;
+    const dy = y - touchStartY;
+    const dt = Date.now() - touchStartTime;
+    if(Math.abs(dx) > 65 && Math.abs(dx) > Math.abs(dy)*1.4 && dt < 800){
+      toggleFlip();
+    }
+  }
+  flipContainer.addEventListener('touchstart', e => {
+    const t = e.touches[0]; swipeStart(t.clientX, t.clientY);
+  }, {passive:true});
+  flipContainer.addEventListener('touchend', e => {
+    const t = e.changedTouches[0]; swipeEnd(t.clientX, t.clientY);
+  }, {passive:true});
+  let mouseDown=false;
+  flipContainer.addEventListener('mousedown', e => { mouseDown=true; swipeStart(e.clientX, e.clientY); });
+  window.addEventListener('mouseup', e => { if(mouseDown){ mouseDown=false; swipeEnd(e.clientX, e.clientY); } });
+
+  /* ---------- THEMES ---------- */
+  const THEMES = [
+    {id:'classic', name:'Klassisk',    t1a:'#00c6ff', t1b:'#0072ff', t2a:'#ff512f', t2b:'#dd2476'},
+    {id:'sunset',  name:'Solnedgang',  t1a:'#f7971e', t1b:'#ffb347', t2a:'#a044ff', t2b:'#6a11cb'},
+    {id:'forest',  name:'Skov',        t1a:'#11998e', t1b:'#38ef7d', t2a:'#ee0979', t2b:'#ff6a00'},
+    {id:'ocean',   name:'Ocean',       t1a:'#00c9ff', t1b:'#0064a8', t2a:'#8f94fb', t2b:'#4e54c8'},
+    {id:'gold',    name:'Guld/Sort',   t1a:'#f7d354', t1b:'#b8860b', t2a:'#9aa0a6', t2b:'#2b2b2b'},
+  ];
+  const themeRow = $('themeRow');
+  THEMES.forEach(th=>{
+    const b = document.createElement('button');
+    b.className='theme-swatch';
+    b.dataset.theme = th.id;
+    b.title = th.name;
+    b.style.background = 'linear-gradient(135deg,'+th.t1a+','+th.t1b+' 50%,'+th.t2b+' 50%,'+th.t2a+')';
+    b.addEventListener('click', ()=>applyTheme(th.id));
+    themeRow.appendChild(b);
+  });
+  function applyTheme(id){
+    const th = THEMES.find(t=>t.id===id) || THEMES[0];
+    const root = document.documentElement.style;
+    root.setProperty('--t1-a', th.t1a);
+    root.setProperty('--t1-b', th.t1b);
+    root.setProperty('--t2-a', th.t2a);
+    root.setProperty('--t2-b', th.t2b);
+    localStorage.setItem('sb_theme', th.id);
+    document.querySelectorAll('.theme-swatch').forEach(el=>{
+      el.classList.toggle('active', el.dataset.theme === th.id);
+    });
+  }
+  applyTheme(localStorage.getItem('sb_theme') || 'classic');
+
+  /* ---------- LAYOUTS ---------- */
+  function applyLayout(n){
+    document.body.classList.remove('layout-1','layout-2','layout-3');
+    document.body.classList.add('layout-'+n);
+    localStorage.setItem('sb_layout', n);
+    document.querySelectorAll('.layout-option').forEach(el=>{
+      el.classList.toggle('active', el.dataset.layout === String(n));
+    });
+  }
+  document.querySelectorAll('.layout-option').forEach(el=>{
+    el.addEventListener('click', ()=>applyLayout(el.dataset.layout));
+  });
+  applyLayout(localStorage.getItem('sb_layout') || '1');
+
+  /* ---------- SOUNDS ---------- */
+  function playWhistle(){
+    try{
+      const ctx = getCtx(); const start = ctx.currentTime;
+      const o = ctx.createOscillator(); const g = ctx.createGain();
+      o.type='sine';
+      o.frequency.setValueAtTime(1700, start);
+      o.frequency.linearRampToValueAtTime(2300, start+0.15);
+      o.frequency.linearRampToValueAtTime(1700, start+0.3);
+      o.frequency.linearRampToValueAtTime(2300, start+0.5);
+      g.gain.setValueAtTime(0.001, start);
+      g.gain.linearRampToValueAtTime(0.28, start+0.03);
+      g.gain.setValueAtTime(0.28, start+0.5);
+      g.gain.exponentialRampToValueAtTime(0.001, start+1.1);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(start); o.stop(start+1.15);
+    }catch(e){}
+  }
+  function playSiren(){
+    try{
+      const ctx = getCtx(); const start = ctx.currentTime; const dur=2.4;
+      const o = ctx.createOscillator(); const g = ctx.createGain();
+      o.type='sawtooth';
+      for(let i=0;i<4;i++){
+        const t0=start+i*0.6;
+        o.frequency.setValueAtTime(420, t0);
+        o.frequency.linearRampToValueAtTime(840, t0+0.3);
+        o.frequency.linearRampToValueAtTime(420, t0+0.6);
+      }
+      g.gain.setValueAtTime(0.18, start);
+      g.gain.setValueAtTime(0.18, start+dur-0.25);
+      g.gain.exponentialRampToValueAtTime(0.001, start+dur);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(start); o.stop(start+dur+0.1);
+    }catch(e){}
+  }
+  function playBell(){
+    try{
+      const ctx = getCtx(); const start = ctx.currentTime;
+      [880,1320,1760].forEach((f,i)=>{
+        const o = ctx.createOscillator(); const g = ctx.createGain();
+        o.type='sine'; o.frequency.value=f;
+        const gv = 0.24/(i+1);
+        g.gain.setValueAtTime(gv, start);
+        g.gain.exponentialRampToValueAtTime(0.001, start+1.8);
+        o.connect(g); g.connect(ctx.destination);
+        o.start(start); o.stop(start+1.85);
+      });
+    }catch(e){}
+  }
+
+  let soundChoice = localStorage.getItem('sb_soundChoice') || 'whistle';
+  let customSoundData = localStorage.getItem('sb_customSound') || '';
+
+  function setSoundChoice(id){
+    soundChoice = id;
+    localStorage.setItem('sb_soundChoice', id);
+    document.querySelectorAll('.sound-option').forEach(el=>{
+      el.classList.toggle('active', el.dataset.sound===id);
+    });
+  }
+  function previewSound(id){
+    if(id==='whistle') playWhistle();
+    else if(id==='siren') playSiren();
+    else if(id==='bell') playBell();
+    else if(id==='custom' && customSoundData){ const a = new Audio(customSoundData); a.play().catch(()=>{}); }
+  }
+  function playSelectedSound(){ previewSound(soundChoice); }
+
+  document.querySelectorAll('.sound-option').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const id = el.dataset.sound;
+      if(id === 'custom'){
+        $('customSoundFile').click();
+      } else {
+        setSoundChoice(id);
+        previewSound(id);
+      }
+    });
+  });
+  $('customSoundFile').addEventListener('change', e=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ev=>{
+      customSoundData = ev.target.result;
+      localStorage.setItem('sb_customSound', customSoundData);
+      setSoundChoice('custom');
+      $('customSoundName').textContent = '✓ ' + file.name;
+      previewSound('custom');
+    };
+    reader.readAsDataURL(file);
+  });
+  setSoundChoice(soundChoice);
+  if(customSoundData){ $('customSoundName').textContent = '✓ Egen lyd gemt'; }
+
+  /* ---------- TIMER ---------- */
+  let timerEnabled = localStorage.getItem('sb_timerEnabled') === '1';
+  let timerDuration = parseInt(localStorage.getItem('sb_timerDuration') || '600', 10);
+  let timerRemaining = timerDuration;
+  let timerRunning = false;
+  let timerIntervalId = null;
+  let extraTimeDuration = parseInt(localStorage.getItem('sb_extraTime') || '120', 10);
+  let suddenDeathActive = false;
+
+  const timerEnableCk = $('timerEnableCk');
+  const timeInputsRow = $('timeInputsRow');
+  const extraTimeInputsRow = $('extraTimeInputsRow');
+  const timerMin = $('timerMin');
+  const timerSec = $('timerSec');
+  const extraMin = $('extraMin');
+  const extraSec = $('extraSec');
+  const timerDisplay = $('timerDisplay');
+  const timerTimeEl = $('timerTime');
+  const timerStartBtn = $('timerStartBtn');
+  const timerResetBtn = $('timerResetBtn');
+  const lockedBanner = $('lockedBanner');
+  const suddenDeathBanner = $('suddenDeathBanner');
+  const flashOverlay = $('flashOverlay');
+  let flashTimeoutId = null;
+
+  function flashScreen(){
+    flashOverlay.classList.add('active');
+    clearTimeout(flashTimeoutId);
+    flashTimeoutId = setTimeout(() => {
+      flashOverlay.classList.remove('active');
+    }, 3500);
+  }
+  function stopFlash(){
+    clearTimeout(flashTimeoutId);
+    flashOverlay.classList.remove('active');
+  }
+
+  /* ---------- WINNER CELEBRATION ---------- */
+  const winnerOverlay = $('winnerOverlay');
+  const winnerTitle = $('winnerTitle');
+  const winnerScoreLine = $('winnerScoreLine');
+
+  function hideWinnerOverlay(){
+    winnerOverlay.classList.remove('show');
+  }
+  winnerOverlay.addEventListener('click', hideWinnerOverlay);
+
+  function megaConfetti(teamNum){
+    const colors = teamNum === 1
+      ? ['#00c6ff','#0072ff','#ffffff','#ffd700']
+      : ['#ff512f','#dd2476','#ffffff','#ffd700'];
+    const count = 90;
+    for(let i=0;i<count;i++){
+      const c = document.createElement('div');
+      c.className = 'confetti';
+      const size = 6 + Math.random()*6;
+      c.style.width = size+'px';
+      c.style.height = (size*1.6)+'px';
+      c.style.background = colors[Math.floor(Math.random()*colors.length)];
+      c.style.left = (Math.random()*window.innerWidth) + 'px';
+      c.style.top = '-20px';
+      const duration = 1800 + Math.random()*1400;
+      c.style.animationDuration = duration+'ms';
+      c.style.animationDelay = (Math.random()*600)+'ms';
+      document.body.appendChild(c);
+      setTimeout(() => c.remove(), duration+700);
+    }
+  }
+
+  function checkAndCelebrateWinner(){
+    if(state.score1 === state.score2) return; // uafgjort, ingen fejring
+    const teamNum = state.score1 > state.score2 ? 1 : 2;
+    const winnerName = teamNum === 1
+      ? (name1.value.trim() || 'Hold 1')
+      : (name2.value.trim() || 'Hold 2');
+    winnerTitle.textContent = winnerName + ' VINDER!';
+    winnerScoreLine.textContent = state.score1 + ' — ' + state.score2;
+    winnerOverlay.classList.add('show');
+    megaConfetti(teamNum);
+    setTimeout(() => megaConfetti(teamNum), 500);
+  }
+
+  /* ---------- TIE / SUDDEN DEATH / FORLÆNGET TID ---------- */
+  const tieOverlay = $('tieOverlay');
+  const tieScoreLine = $('tieScoreLine');
+  const suddenDeathBtn = $('suddenDeathBtn');
+  const extraTimeBtn = $('extraTimeBtn');
+
+  function showTieOverlay(){
+    tieScoreLine.textContent = state.score1 + ' — ' + state.score2;
+    tieOverlay.classList.add('show');
+  }
+  function hideTieOverlay(){
+    tieOverlay.classList.remove('show');
+  }
+  tieOverlay.addEventListener('click', e => { if(e.target === tieOverlay){ hideTieOverlay(); } });
+
+  function enterSuddenDeath(){
+    hideTieOverlay();
+    suddenDeathActive = true;
+    unlockScoring();
+    lockedBanner.classList.remove('show');
+    suddenDeathBanner.classList.add('show');
+    timerTimeEl.classList.remove('locked','warning');
+    timerTimeEl.classList.add('suddendeath');
+    timerTimeEl.textContent = 'SUDDEN DEATH';
+  }
+  function exitSuddenDeath(){
+    suddenDeathActive = false;
+    suddenDeathBanner.classList.remove('show');
+    timerTimeEl.classList.remove('suddendeath');
+  }
+  function startExtraTime(){
+    hideTieOverlay();
+    unlockScoring();
+    lockedBanner.classList.remove('show');
+    timerTimeEl.classList.remove('locked','warning','suddendeath');
+    timerRemaining = extraTimeDuration;
+    timerTimeEl.textContent = fmtTime(timerRemaining);
+    timerRunning = true;
+    timerStartBtn.textContent = '⏸ Pause';
+    clearInterval(timerIntervalId);
+    timerIntervalId = setInterval(tick, 1000);
+  }
+  suddenDeathBtn.addEventListener('click', enterSuddenDeath);
+  extraTimeBtn.addEventListener('click', startExtraTime);
+
+  function fmtTime(sec){
+    const m = Math.floor(sec/60), s = sec % 60;
+    return String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+  }
+  function initTimerUI(){
+    timerEnableCk.checked = timerEnabled;
+    timeInputsRow.style.display = timerEnabled ? 'flex' : 'none';
+    extraTimeInputsRow.style.display = timerEnabled ? 'flex' : 'none';
+    timerDisplay.style.display = timerEnabled ? 'block' : 'none';
+    timerMin.value = Math.floor(timerDuration/60);
+    timerSec.value = timerDuration % 60;
+    extraMin.value = Math.floor(extraTimeDuration/60);
+    extraSec.value = extraTimeDuration % 60;
+    timerTimeEl.textContent = fmtTime(timerRemaining);
+  }
+  initTimerUI();
+
+  timerEnableCk.addEventListener('change', ()=>{
+    timerEnabled = timerEnableCk.checked;
+    localStorage.setItem('sb_timerEnabled', timerEnabled ? '1' : '0');
+    timeInputsRow.style.display = timerEnabled ? 'flex' : 'none';
+    extraTimeInputsRow.style.display = timerEnabled ? 'flex' : 'none';
+    timerDisplay.style.display = timerEnabled ? 'block' : 'none';
+    if(!timerEnabled){ pauseTimer(); unlockScoring(); lockedBanner.classList.remove('show'); stopFlash(); hideWinnerOverlay(); hideTieOverlay(); exitSuddenDeath(); }
+  });
+
+  function updateExtraTimeFromInputs(){
+    const m = Math.max(0, parseInt(extraMin.value || '0', 10));
+    const s = Math.min(59, Math.max(0, parseInt(extraSec.value || '0', 10)));
+    extraTimeDuration = m*60 + s;
+    localStorage.setItem('sb_extraTime', extraTimeDuration);
+  }
+  extraMin.addEventListener('change', updateExtraTimeFromInputs);
+  extraSec.addEventListener('change', updateExtraTimeFromInputs);
+
+  function updateDurationFromInputs(){
+    const m = Math.max(0, parseInt(timerMin.value || '0', 10));
+    const s = Math.min(59, Math.max(0, parseInt(timerSec.value || '0', 10)));
+    timerDuration = m*60 + s;
+    localStorage.setItem('sb_timerDuration', timerDuration);
+    if(!timerRunning){
+      timerRemaining = timerDuration;
+      timerTimeEl.textContent = fmtTime(timerRemaining);
+      timerTimeEl.classList.remove('warning','locked');
+    }
+  }
+  timerMin.addEventListener('change', updateDurationFromInputs);
+  timerSec.addEventListener('change', updateDurationFromInputs);
+
+  function startPauseTimer(){
+    if(locked) return;
+    if(timerRunning){
+      pauseTimer();
+    } else {
+      if(timerRemaining <= 0){ timerRemaining = timerDuration; }
+      timerRunning = true;
+      timerStartBtn.textContent = '⏸ Pause';
+      timerIntervalId = setInterval(tick, 1000);
+    }
+  }
+  function pauseTimer(){
+    timerRunning = false;
+    timerStartBtn.textContent = '▶ Start';
+    if(timerIntervalId){ clearInterval(timerIntervalId); timerIntervalId = null; }
+  }
+  function resetTimer(){
+    pauseTimer();
+    timerRemaining = timerDuration;
+    timerTimeEl.textContent = fmtTime(timerRemaining);
+    timerTimeEl.classList.remove('warning','locked','suddendeath');
+    unlockScoring();
+    lockedBanner.classList.remove('show');
+    stopFlash();
+    hideWinnerOverlay();
+    hideTieOverlay();
+    exitSuddenDeath();
+  }
+  function tick(){
+    timerRemaining--;
+    timerTimeEl.classList.toggle('warning', timerRemaining <= 10 && timerRemaining > 0);
+    if(timerRemaining <= 0){
+      timerRemaining = 0;
+      pauseTimer();
+      timerTimeEl.classList.remove('warning');
+      timerTimeEl.classList.add('locked');
+      lockScoring();
+      playSelectedSound();
+      flashScreen();
+      if(state.score1 === state.score2){
+        showTieOverlay();
+      } else {
+        lockedBanner.classList.add('show');
+        checkAndCelebrateWinner();
+      }
+    }
+    timerTimeEl.textContent = fmtTime(Math.max(0,timerRemaining));
+  }
+  timerStartBtn.addEventListener('click', startPauseTimer);
+  timerResetBtn.addEventListener('click', resetTimer);
+
+  function lockScoring(){
+    locked = true;
+    btn1.disabled = true; btn2.disabled = true;
+    updateMinusButtons();
+  }
+  function unlockScoring(){
+    locked = false;
+    btn1.disabled = false; btn2.disabled = false;
+    updateMinusButtons();
+  }
+})();
+</script>
+
+</body>
+</html>
