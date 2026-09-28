@@ -6,12 +6,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Scoreboard">
 <meta name="theme-color" content="#0f0c29">
-<link rel="manifest" href="manifest.json">
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>Scoreboard</title>
 <style>
   :root{
@@ -284,6 +279,76 @@
   .tie-score{ font-size:clamp(15px,3.6vw,20px); color:rgba(255,255,255,0.85); margin:8px 0 18px; font-weight:700; }
   .tie-buttons{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
   .tie-btn{ font-size:13px; padding:10px 16px; }
+
+  /* PLAYER NUMBER PANEL */
+  .playernum-overlay{
+    position:fixed; inset:0; z-index:9996;
+    display:none; align-items:center; justify-content:center;
+    background:rgba(0,0,0,0.62); backdrop-filter:blur(4px); padding:20px;
+  }
+  .playernum-overlay.show{ display:flex; animation:winnerFadeIn .3s ease; }
+  .playernum-card{
+    background:linear-gradient(160deg, rgba(30,28,58,0.98), rgba(20,18,42,0.98));
+    border:2px solid rgba(255,255,255,0.18);
+    border-radius:22px;
+    padding:22px 22px 18px;
+    width:min(340px,90vw);
+    box-shadow:0 20px 60px rgba(0,0,0,0.6);
+    animation:winnerPop .4s cubic-bezier(.34,1.56,.64,1);
+  }
+  .playernum-title{
+    text-align:center; font-size:15px; font-weight:800; letter-spacing:0.5px;
+    color:#fff; margin-bottom:12px;
+  }
+  .playernum-recent{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-bottom:12px; }
+  .playernum-chip{
+    background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.25);
+    color:#fff; font-weight:700; font-size:13px; padding:7px 13px; border-radius:20px; cursor:pointer;
+  }
+  .playernum-chip:active{ transform:scale(0.94); }
+  .playernum-display{
+    text-align:center; font-size:40px; font-weight:900; color:var(--gold);
+    text-shadow:0 0 20px rgba(255,215,0,0.4);
+    margin-bottom:14px; min-height:50px; letter-spacing:2px;
+  }
+  .playernum-keypad{
+    display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:14px;
+  }
+  .playernum-key{
+    background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15);
+    color:#fff; font-size:19px; font-weight:700; border-radius:12px; padding:13px 0; cursor:pointer;
+  }
+  .playernum-key:active{ background:rgba(255,255,255,0.2); transform:scale(0.96); }
+  .playernum-key.confirm{ background:linear-gradient(180deg,#38ef7d,#11998e); border:none; }
+  .playernum-key.backspace{ background:rgba(255,60,60,0.22); }
+  .playernum-actions{ display:flex; gap:8px; justify-content:center; }
+  .playernum-actions .tool-btn{ font-size:12px; }
+
+  .stats-btn{
+    display:block; margin:6px auto 0; font-size:11px;
+    background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.2);
+    color:rgba(255,255,255,0.8); padding:5px 10px; border-radius:20px; cursor:pointer;
+  }
+  .stats-overlay{
+    position:fixed; inset:0; z-index:9996;
+    display:none; align-items:center; justify-content:center;
+    background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); padding:20px;
+  }
+  .stats-overlay.show{ display:flex; animation:winnerFadeIn .3s ease; }
+  .stats-card{
+    background:linear-gradient(160deg, rgba(30,28,58,0.98), rgba(20,18,42,0.98));
+    border:2px solid rgba(255,255,255,0.18); border-radius:22px;
+    padding:22px; width:min(320px,90vw); max-height:70vh; overflow-y:auto;
+    box-shadow:0 20px 60px rgba(0,0,0,0.6); animation:winnerPop .4s cubic-bezier(.34,1.56,.64,1);
+  }
+  .stats-title{ text-align:center; font-size:16px; font-weight:800; color:#fff; margin-bottom:14px; }
+  .stats-row{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:9px 4px; border-bottom:1px solid rgba(255,255,255,0.1); font-size:14px; color:#fff;
+  }
+  .stats-row .num{ font-weight:800; color:var(--gold); }
+  .stats-empty{ text-align:center; font-size:13px; color:rgba(255,255,255,0.5); padding:10px 0; }
+  .stats-card .tool-btn{ display:block; margin:14px auto 0; }
 
   .arena{
     display:grid;
@@ -820,6 +885,40 @@
   </div>
 </div>
 
+<div class="playernum-overlay" id="playerNumOverlay">
+  <div class="playernum-card">
+    <div class="playernum-title" id="playerNumTitle">Hvem scorede?</div>
+    <div class="playernum-recent" id="playerNumRecent"></div>
+    <div class="playernum-display" id="playerNumDisplay">–</div>
+    <div class="playernum-keypad" id="playerNumKeypad">
+      <button class="playernum-key" data-key="1">1</button>
+      <button class="playernum-key" data-key="2">2</button>
+      <button class="playernum-key" data-key="3">3</button>
+      <button class="playernum-key" data-key="4">4</button>
+      <button class="playernum-key" data-key="5">5</button>
+      <button class="playernum-key" data-key="6">6</button>
+      <button class="playernum-key" data-key="7">7</button>
+      <button class="playernum-key" data-key="8">8</button>
+      <button class="playernum-key" data-key="9">9</button>
+      <button class="playernum-key backspace" data-key="back">⌫</button>
+      <button class="playernum-key" data-key="0">0</button>
+      <button class="playernum-key confirm" data-key="ok">✔</button>
+    </div>
+    <div class="playernum-actions">
+      <button class="tool-btn" id="playerNumSkip">Spring over</button>
+      <button class="tool-btn" id="playerNumCancel">Annullér</button>
+    </div>
+  </div>
+</div>
+
+<div class="stats-overlay" id="statsOverlay">
+  <div class="stats-card">
+    <div class="stats-title" id="statsTitle">Spillerpoint</div>
+    <div id="statsList"></div>
+    <button class="tool-btn" id="statsCloseBtn">Luk</button>
+  </div>
+</div>
+
 <div class="flip-container" id="flipContainer">
   <div class="flip-inner" id="flipInner">
 
@@ -866,6 +965,7 @@
 
           <button class="point-btn" id="btn1"><span class="plus">+</span>1 POINT</button>
           <button class="minus-btn" id="minus1" title="Træk 1 point fra">−1</button>
+          <button class="stats-btn" id="statsBtn1">📋 Spillerpoint</button>
         </div>
 
         <div class="team-panel t2" id="panel2">
@@ -886,6 +986,7 @@
 
           <button class="point-btn" id="btn2"><span class="plus">+</span>1 POINT</button>
           <button class="minus-btn" id="minus2" title="Træk 1 point fra">−1</button>
+          <button class="stats-btn" id="statsBtn2">📋 Spillerpoint</button>
         </div>
       </div>
 
@@ -922,6 +1023,14 @@
       </section>
 
       <section class="settings-section">
+        <h3>Spillernummer</h3>
+        <div class="switch-row">
+          <span>Registrér hvem der scorer</span>
+          <label class="switch"><input type="checkbox" id="playerNumEnableCk"><span class="slider-toggle"></span></label>
+        </div>
+      </section>
+
+      <section class="settings-section">
         <h3>Gemte hold</h3>
         <div class="saved-team-row" id="savedTeamRow"></div>
       </section>
@@ -952,6 +1061,16 @@
         </div>
         <input type="file" id="customSoundFile" accept="audio/*" style="display:none">
         <div class="custom-sound-name" id="customSoundName"></div>
+      </section>
+
+      <section class="settings-section">
+        <h3>Backup</h3>
+        <div class="sound-row">
+          <button class="sound-option" id="exportBackupBtn">📤 Del/gem backup</button>
+          <button class="sound-option" id="importBackupBtn">⬆️ Indlæs backup</button>
+        </div>
+        <input type="file" id="importBackupFile" accept="application/json,.json" style="display:none">
+        <div class="custom-sound-name" id="backupStatus">Del alle hold, billeder og indstillinger som én fil – vælg selv hvor den skal gemmes (fx en mappe kaldet "scoreboarddata"). Indlæs den samme fil igen for at hente det hele tilbage.</div>
       </section>
     </div>
 
@@ -1163,7 +1282,7 @@
     }, 560);
   }
 
-  function addPoint(team){
+  function addPoint(team, playerNum){
     if(team === 1){
       state.score1++;
       localStorage.setItem('sb_score1', state.score1);
@@ -1177,6 +1296,7 @@
       pulseBtn(btn2);
       burstConfetti(btn2, 't2');
     }
+    logPlayerPoint(team, playerNum);
     updateLeader();
     updateMinusButtons();
     beep();
@@ -1192,10 +1312,12 @@
       state.score1--;
       localStorage.setItem('sb_score1', state.score1);
       flipScore(flip1, face1front, face1back, state.score1);
+      popLastPlayerLog(1);
     } else if(team === 2 && state.score2 > 0){
       state.score2--;
       localStorage.setItem('sb_score2', state.score2);
       flipScore(flip2, face2front, face2back, state.score2);
+      popLastPlayerLog(2);
     }
     updateLeader();
     updateMinusButtons();
@@ -1260,14 +1382,155 @@
     }catch(e){}
   }
 
-  btn1.addEventListener('click', () => addPoint(1));
-  btn2.addEventListener('click', () => addPoint(2));
+  btn1.addEventListener('click', () => { if(playerNumEnabled){ openPlayerNumPanel(1); } else { addPoint(1, null); } });
+  btn2.addEventListener('click', () => { if(playerNumEnabled){ openPlayerNumPanel(2); } else { addPoint(2, null); } });
   minus1.addEventListener('click', () => removePoint(1));
   minus2.addEventListener('click', () => removePoint(2));
 
+  /* ---------- SPILLERNUMMER: TALPANEL & STATISTIK ---------- */
+  let playerNumEnabled = localStorage.getItem('sb_playerNumEnabled') !== '0';
+  const playerNumEnableCk = $('playerNumEnableCk');
+  const statsBtn1El = $('statsBtn1');
+  const statsBtn2El = $('statsBtn2');
+
+  function applyPlayerNumVisibility(){
+    statsBtn1El.style.display = playerNumEnabled ? 'block' : 'none';
+    statsBtn2El.style.display = playerNumEnabled ? 'block' : 'none';
+  }
+  playerNumEnableCk.checked = playerNumEnabled;
+  applyPlayerNumVisibility();
+  playerNumEnableCk.addEventListener('change', () => {
+    playerNumEnabled = playerNumEnableCk.checked;
+    localStorage.setItem('sb_playerNumEnabled', playerNumEnabled ? '1' : '0');
+    applyPlayerNumVisibility();
+  });
+
+  const playerNumOverlay = $('playerNumOverlay');
+  const playerNumTitle = $('playerNumTitle');
+  const playerNumRecent = $('playerNumRecent');
+  const playerNumDisplay = $('playerNumDisplay');
+  const playerNumKeypad = $('playerNumKeypad');
+  let pendingTeam = null;
+  let playerNumInput = '';
+
+  function getPlayerLog(team){
+    try{ return JSON.parse(localStorage.getItem('sb_playerLog'+team) || '[]'); }
+    catch(e){ return []; }
+  }
+  function setPlayerLog(team, log){
+    localStorage.setItem('sb_playerLog'+team, JSON.stringify(log));
+  }
+  function logPlayerPoint(team, num){
+    const log = getPlayerLog(team);
+    log.push(num);
+    setPlayerLog(team, log);
+  }
+  function popLastPlayerLog(team){
+    const log = getPlayerLog(team);
+    log.pop();
+    setPlayerLog(team, log);
+  }
+
+  function updatePlayerNumDisplay(){
+    playerNumDisplay.textContent = playerNumInput === '' ? '–' : ('#' + playerNumInput);
+  }
+  function renderRecentNumbers(team){
+    const log = getPlayerLog(team).filter(n => n !== null && n !== undefined);
+    const recentUnique = [];
+    for(let i = log.length-1; i>=0 && recentUnique.length<6; i--){
+      if(!recentUnique.includes(log[i])) recentUnique.push(log[i]);
+    }
+    playerNumRecent.innerHTML = '';
+    if(recentUnique.length === 0){ playerNumRecent.style.display = 'none'; return; }
+    playerNumRecent.style.display = 'flex';
+    recentUnique.forEach(n => {
+      const b = document.createElement('button');
+      b.className = 'playernum-chip';
+      b.textContent = '#' + n;
+      b.addEventListener('click', () => {
+        addPoint(pendingTeam, n);
+        closePlayerNumPanel();
+      });
+      playerNumRecent.appendChild(b);
+    });
+  }
+  function openPlayerNumPanel(team){
+    pendingTeam = team;
+    playerNumInput = '';
+    updatePlayerNumDisplay();
+    const teamName = team === 1 ? (name1.value.trim() || 'Hold 1') : (name2.value.trim() || 'Hold 2');
+    playerNumTitle.textContent = 'Hvem scorede? (' + teamName + ')';
+    renderRecentNumbers(team);
+    playerNumOverlay.classList.add('show');
+  }
+  function closePlayerNumPanel(){
+    playerNumOverlay.classList.remove('show');
+    pendingTeam = null;
+  }
+  playerNumKeypad.addEventListener('click', e => {
+    const btn = e.target.closest('.playernum-key');
+    if(!btn) return;
+    const key = btn.dataset.key;
+    if(key === 'back'){ playerNumInput = playerNumInput.slice(0,-1); updatePlayerNumDisplay(); }
+    else if(key === 'ok'){
+      if(playerNumInput === '') return;
+      addPoint(pendingTeam, parseInt(playerNumInput,10));
+      closePlayerNumPanel();
+    }
+    else{
+      if(playerNumInput.length >= 2) return;
+      playerNumInput += key;
+      updatePlayerNumDisplay();
+    }
+  });
+  $('playerNumSkip').addEventListener('click', () => {
+    addPoint(pendingTeam, null);
+    closePlayerNumPanel();
+  });
+  $('playerNumCancel').addEventListener('click', closePlayerNumPanel);
+  playerNumOverlay.addEventListener('click', e => { if(e.target === playerNumOverlay){ closePlayerNumPanel(); } });
+
+  const statsOverlay = $('statsOverlay');
+  const statsTitle = $('statsTitle');
+  const statsList = $('statsList');
+  function renderStats(team){
+    const teamName = team === 1 ? (name1.value.trim() || 'Hold 1') : (name2.value.trim() || 'Hold 2');
+    statsTitle.textContent = '📋 ' + teamName + ' – Spillerpoint';
+    const log = getPlayerLog(team);
+    const tally = {};
+    let noNumber = 0;
+    log.forEach(n => {
+      if(n === null || n === undefined){ noNumber++; }
+      else{ tally[n] = (tally[n]||0) + 1; }
+    });
+    const entries = Object.keys(tally).map(k => ({ num:k, points:tally[k] })).sort((a,b) => b.points-a.points);
+    statsList.innerHTML = '';
+    if(entries.length === 0 && noNumber === 0){
+      statsList.innerHTML = '<div class="stats-empty">Ingen point registreret endnu.</div>';
+    } else {
+      entries.forEach(e => {
+        const row = document.createElement('div');
+        row.className = 'stats-row';
+        row.innerHTML = '<span class="num">#' + e.num + '</span><span>' + e.points + ' point</span>';
+        statsList.appendChild(row);
+      });
+      if(noNumber > 0){
+        const row = document.createElement('div');
+        row.className = 'stats-row';
+        row.innerHTML = '<span>Uden nummer</span><span>' + noNumber + ' point</span>';
+        statsList.appendChild(row);
+      }
+    }
+    statsOverlay.classList.add('show');
+  }
+  $('statsBtn1').addEventListener('click', () => renderStats(1));
+  $('statsBtn2').addEventListener('click', () => renderStats(2));
+  $('statsCloseBtn').addEventListener('click', () => statsOverlay.classList.remove('show'));
+  statsOverlay.addEventListener('click', e => { if(e.target === statsOverlay){ statsOverlay.classList.remove('show'); } });
+
   $('resetBtn').addEventListener('click', () => {
     if(!confirm('Nulstil hele kampen (navne, billeder og stilling)?')) return;
-    ['sb_name1','sb_name2','sb_photo1','sb_photo2','sb_score1','sb_score2'].forEach(k => localStorage.removeItem(k));
+    ['sb_name1','sb_name2','sb_photo1','sb_photo2','sb_score1','sb_score2','sb_playerLog1','sb_playerLog2'].forEach(k => localStorage.removeItem(k));
     location.reload();
   });
 
@@ -1337,12 +1600,23 @@
     document.addEventListener(evt, updateFullscreenBtn);
   });
 
-  /* ---------- SERVICE WORKER (offline-understøttelse) ---------- */
-  if('serviceWorker' in navigator){
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('service-worker.js').catch(() => {});
-    });
-  }
+  /* ---------- MANIFEST (til "Føj til startskærm") ---------- */
+  try{
+    const manifest = {
+      name: 'Scoreboard',
+      short_name: 'Scoreboard',
+      start_url: '.',
+      display: 'standalone',
+      orientation: 'any',
+      background_color: '#0f0c29',
+      theme_color: '#0f0c29'
+    };
+    const manifestBlob = new Blob([JSON.stringify(manifest)], {type:'application/json'});
+    const manifestLink = document.createElement('link');
+    manifestLink.rel = 'manifest';
+    manifestLink.href = URL.createObjectURL(manifestBlob);
+    document.head.appendChild(manifestLink);
+  }catch(e){}
 
   let touchStartX=0, touchStartY=0, touchStartTime=0, tracking=false;
   function swipeStart(x,y){ touchStartX=x; touchStartY=y; touchStartTime=Date.now(); tracking=true; }
@@ -1507,6 +1781,81 @@
   });
   setSoundChoice(soundChoice);
   if(customSoundData){ $('customSoundName').textContent = '✓ Egen lyd gemt'; }
+
+  /* ---------- BACKUP: DEL / INDLÆS ---------- */
+  const BACKUP_KEYS = [
+    'sb_name1','sb_name2','sb_photo1','sb_photo2','sb_score1','sb_score2',
+    'sb_theme','sb_layout','sb_timerEnabled','sb_timerDuration','sb_extraTime',
+    'sb_soundChoice','sb_customSound','sb_savedTeams','sb_playerLog1','sb_playerLog2','sb_playerNumEnabled'
+  ];
+  const backupStatus = $('backupStatus');
+
+  async function exportBackup(){
+    const data = {};
+    BACKUP_KEYS.forEach(k => {
+      const v = localStorage.getItem(k);
+      if(v !== null) data[k] = v;
+    });
+    const backup = { app:'scoreboard', version:1, exportedAt: new Date().toISOString(), data };
+    const json = JSON.stringify(backup, null, 2);
+    const stamp = new Date().toISOString().slice(0,10);
+    const filename = 'scoreboard-backup-' + stamp + '.json';
+    const file = new File([json], filename, { type:'application/json' });
+
+    if(navigator.canShare && navigator.canShare({ files:[file] })){
+      try{
+        await navigator.share({
+          files:[file],
+          title:'Scoreboard backup',
+          text:'Backup af hold, billeder og indstillinger fra Scoreboard-appen.'
+        });
+        backupStatus.textContent = '✓ Backup delt.';
+        return;
+      }catch(err){
+        if(err && err.name === 'AbortError'){ return; } // brugeren fortrød i del-dialogen
+        // ellers falder vi tilbage til almindelig download nedenfor
+      }
+    }
+    try{
+      const blob = new Blob([json], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      backupStatus.textContent = '✓ Backup downloadet: ' + filename;
+    }catch(e){
+      backupStatus.textContent = 'Kunne ikke oprette backup-filen.';
+    }
+  }
+
+  function importBackup(file){
+    const reader = new FileReader();
+    reader.onload = ev => {
+      let parsed;
+      try{ parsed = JSON.parse(ev.target.result); }
+      catch(e){ alert('Filen kunne ikke læses. Vælg en gyldig backup-fil.'); return; }
+      if(!parsed || !parsed.data){ alert('Filen ser ikke ud til at være en gyldig Scoreboard-backup.'); return; }
+      if(!confirm('Dette overskriver dine nuværende hold, billeder og indstillinger med indholdet fra backup-filen. Fortsæt?')) return;
+      try{
+        Object.keys(parsed.data).forEach(k => {
+          if(BACKUP_KEYS.includes(k)){ localStorage.setItem(k, parsed.data[k]); }
+        });
+        backupStatus.textContent = '✓ Backup indlæst – genindlæser...';
+        setTimeout(() => location.reload(), 600);
+      }catch(e){
+        alert('Der er ikke nok plads i lageret til at indlæse hele backuppen.');
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  $('exportBackupBtn').addEventListener('click', exportBackup);
+  $('importBackupBtn').addEventListener('click', () => $('importBackupFile').click());
+  $('importBackupFile').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if(file) importBackup(file);
+  });
 
   /* ---------- TIMER ---------- */
   let timerEnabled = localStorage.getItem('sb_timerEnabled') === '1';
