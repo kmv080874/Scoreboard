@@ -1113,6 +1113,14 @@
       </section>
 
       <section class="settings-section">
+        <h3>Stemme-oplæsning</h3>
+        <div class="switch-row">
+          <span>Læs scoren højt ved point</span>
+          <label class="switch"><input type="checkbox" id="voiceEnableCk"><span class="slider-toggle"></span></label>
+        </div>
+      </section>
+
+      <section class="settings-section">
         <h3>Gemte hold</h3>
         <div class="saved-team-row" id="savedTeamRow"></div>
       </section>
@@ -1383,6 +1391,7 @@
     logPlayerPoint(team, playerNum);
     updateLastScorerDisplay(team);
     if(playerNumEnabled){ showScorerToast(team, playerNum); }
+    speakScore(team, playerNum);
     updateLeader();
     updateMinusButtons();
     beep();
@@ -1517,6 +1526,50 @@
     void scorerToast.offsetWidth;
     scorerToast.classList.add(team === 1 ? 't1' : 't2', 'show');
     scorerToastTimeout = setTimeout(() => scorerToast.classList.remove('show'), 1150);
+  }
+
+  /* ---------- STEMME-OPLÆSNING ---------- */
+  let voiceEnabled = localStorage.getItem('sb_voiceEnabled') === '1';
+  const voiceEnableCk = $('voiceEnableCk');
+  voiceEnableCk.checked = voiceEnabled;
+  voiceEnableCk.addEventListener('change', () => {
+    voiceEnabled = voiceEnableCk.checked;
+    localStorage.setItem('sb_voiceEnabled', voiceEnabled ? '1' : '0');
+    if(voiceEnabled){ speakText('Stemme-oplæsning er slået til.'); }
+  });
+
+  let danishVoice = null;
+  function pickDanishVoice(){
+    if(!('speechSynthesis' in window)) return;
+    const voices = speechSynthesis.getVoices();
+    danishVoice = voices.find(v => v.lang && v.lang.toLowerCase().startsWith('da')) || null;
+  }
+  if('speechSynthesis' in window){
+    pickDanishVoice();
+    speechSynthesis.onvoiceschanged = pickDanishVoice;
+  }
+  function speakText(text){
+    if(!('speechSynthesis' in window)) return;
+    try{
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = 'da-DK';
+      if(danishVoice) utter.voice = danishVoice;
+      utter.rate = 1.0;
+      speechSynthesis.cancel();
+      speechSynthesis.speak(utter);
+    }catch(e){}
+  }
+  function speakScore(team, playerNum){
+    if(!voiceEnabled) return;
+    const teamName = team === 1 ? (name1.value.trim() || 'Hold 1') : (name2.value.trim() || 'Hold 2');
+    const ownScore = team === 1 ? state.score1 : state.score2;
+    const oppScore = team === 1 ? state.score2 : state.score1;
+    let text = teamName + ' scorer';
+    if(playerNumEnabled && playerNum !== null && playerNum !== undefined){
+      text = 'Nummer ' + playerNum + ' scorer for ' + teamName;
+    }
+    text += '. Stillingen er ' + ownScore + ' til ' + oppScore + '.';
+    speakText(text);
   }
 
   const playerNumOverlay = $('playerNumOverlay');
@@ -1927,7 +1980,7 @@
   const BACKUP_KEYS = [
     'sb_name1','sb_name2','sb_photo1','sb_photo2','sb_score1','sb_score2',
     'sb_theme','sb_layout','sb_timerEnabled','sb_timerDuration','sb_extraTime',
-    'sb_soundChoice','sb_customSound','sb_savedTeams','sb_playerLog1','sb_playerLog2','sb_playerNumEnabled'
+    'sb_soundChoice','sb_customSound','sb_savedTeams','sb_playerLog1','sb_playerLog2','sb_playerNumEnabled','sb_voiceEnabled'
   ];
   const backupStatus = $('backupStatus');
 
