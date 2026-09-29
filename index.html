@@ -852,7 +852,7 @@
       font-size:11px;
       color:#555;
       line-height:1.7;
-      max-height:180px;
+      max-height:340px;
       overflow:hidden;
     }
     .p-scorelog-title{
@@ -867,6 +867,30 @@
     }
     .p-scorelog-entry{ display:inline-block; margin:0 6px 4px 0; }
     .p-scorelog-entry b{ color:#222; }
+    .p-stats-title{
+      font-size:10px;
+      font-weight:800;
+      letter-spacing:1px;
+      text-transform:uppercase;
+      color:#999;
+      margin-bottom:6px;
+      border-top:1px solid #eee;
+      padding-top:8px;
+    }
+    .p-stats-table{
+      width:100%;
+      border-collapse:collapse;
+      font-size:11px;
+      color:#333;
+      margin-bottom:4px;
+    }
+    .p-stats-table td{
+      padding:3px 4px;
+      border-bottom:1px solid #f0f0f0;
+      text-align:left;
+    }
+    .p-stats-table td:last-child{ text-align:right; font-weight:700; color:#222; }
+    .p-stats-table td:first-child{ font-weight:700; color:#0072ff; }
     .p-vs{
       font-size:28px;
       font-weight:800;
@@ -1771,8 +1795,28 @@
       if(!playerNumEnabled) return '';
       const log = getPlayerLog(team);
       if(log.length === 0) return '';
-      const entries = log.map((n,i) => '<span class="p-scorelog-entry">' + (i+1) + '. <b>' + (n===null||n===undefined?'–':'#'+n) + '</b></span>').join(' ');
-      return '<div class="p-scorelog-title">Pointrækkefølge</div><div>' + entries + '</div>';
+
+      const tally = {};
+      let noNumber = 0;
+      log.forEach(n => {
+        if(n === null || n === undefined){ noNumber++; }
+        else{ tally[n] = (tally[n]||0) + 1; }
+      });
+      const entries = Object.keys(tally).map(k => ({ num:k, points:tally[k] })).sort((a,b) => b.points-a.points);
+
+      let statsHTML = '<div class="p-stats-title">Statistik – point pr. spiller</div><table class="p-stats-table">';
+      entries.forEach(e => {
+        statsHTML += '<tr><td>#' + e.num + '</td><td>' + e.points + ' point</td></tr>';
+      });
+      if(noNumber > 0){
+        statsHTML += '<tr><td>Uden nummer</td><td>' + noNumber + ' point</td></tr>';
+      }
+      statsHTML += '</table>';
+
+      const seqEntries = log.map((n,i) => '<span class="p-scorelog-entry">' + (i+1) + '. <b>' + (n===null||n===undefined?'–':'#'+n) + '</b></span>').join(' ');
+      const seqHTML = '<div class="p-scorelog-title">Pointrækkefølge</div><div>' + seqEntries + '</div>';
+
+      return statsHTML + seqHTML;
     }
     $('pScoreLog1').innerHTML = buildScoreLogHTML(1);
     $('pScoreLog2').innerHTML = buildScoreLogHTML(2);
