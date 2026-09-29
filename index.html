@@ -348,7 +348,25 @@
   }
   .stats-row .num{ font-weight:800; color:var(--gold); }
   .stats-empty{ text-align:center; font-size:13px; color:rgba(255,255,255,0.5); padding:10px 0; }
+  .stats-subtitle{
+    font-size:11px; font-weight:800; letter-spacing:1px; text-transform:uppercase;
+    color:rgba(255,255,255,0.45); margin:16px 0 8px;
+  }
+  .stats-log{ display:flex; flex-wrap:wrap; gap:6px; }
+  .stats-log-entry{
+    background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15);
+    color:rgba(255,255,255,0.85); font-size:12px; padding:5px 9px; border-radius:14px;
+  }
+  .stats-log-entry b{ color:var(--gold); }
   .stats-card .tool-btn{ display:block; margin:14px auto 0; }
+  .stats-subtitle{
+    font-size:11px; letter-spacing:1px; text-transform:uppercase;
+    color:rgba(255,255,255,0.45); margin-bottom:8px;
+  }
+  .stats-order{
+    font-size:13.5px; line-height:1.8; color:#fff;
+    background:rgba(255,255,255,0.06); border-radius:10px; padding:10px 12px;
+  }
 
   .arena{
     display:grid;
@@ -559,6 +577,45 @@
     letter-spacing:4px;
     color:rgba(255,255,255,0.35);
     margin:10px 0 -2px;
+  }
+
+  .last-scorer{
+    text-align:center;
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:0.5px;
+    color:rgba(255,255,255,0.55);
+    margin-top:-2px;
+  }
+
+  .scorer-toast{
+    position:fixed;
+    top:38%; left:50%;
+    transform:translate(-50%,-50%) scale(0.5);
+    z-index:10001;
+    pointer-events:none;
+    opacity:0;
+    font-size:clamp(28px,8vw,46px);
+    font-weight:900;
+    letter-spacing:1px;
+    padding:16px 30px;
+    border-radius:20px;
+    background:rgba(20,18,42,0.85);
+    border:2px solid rgba(255,255,255,0.3);
+    box-shadow:0 20px 50px rgba(0,0,0,0.5);
+    color:var(--gold);
+    text-shadow:0 0 20px rgba(255,215,0,0.6);
+    white-space:nowrap;
+  }
+  .scorer-toast.t1{ color:var(--t1-a); text-shadow:0 0 20px rgba(0,198,255,0.6); }
+  .scorer-toast.t2{ color:var(--t2-a); text-shadow:0 0 20px rgba(255,81,47,0.6); }
+  .scorer-toast.show{ animation:scorerPop 1.1s ease forwards; }
+  @keyframes scorerPop{
+    0%{ opacity:0; transform:translate(-50%,-50%) scale(0.5); }
+    18%{ opacity:1; transform:translate(-50%,-50%) scale(1.08); }
+    30%{ transform:translate(-50%,-50%) scale(1); }
+    75%{ opacity:1; }
+    100%{ opacity:0; transform:translate(-50%,-50%) scale(1); }
   }
 
   footer{
@@ -789,6 +846,27 @@
     .p-team.winner .p-name::after{
       content:" 🏆";
     }
+    .p-scorelog{
+      margin-top:12px;
+      text-align:left;
+      font-size:11px;
+      color:#555;
+      line-height:1.7;
+      max-height:180px;
+      overflow:hidden;
+    }
+    .p-scorelog-title{
+      font-size:10px;
+      font-weight:800;
+      letter-spacing:1px;
+      text-transform:uppercase;
+      color:#999;
+      margin-bottom:4px;
+      border-top:1px solid #eee;
+      padding-top:8px;
+    }
+    .p-scorelog-entry{ display:inline-block; margin:0 6px 4px 0; }
+    .p-scorelog-entry b{ color:#222; }
     .p-vs{
       font-size:28px;
       font-weight:800;
@@ -863,6 +941,8 @@
 <body class="layout-1">
 
 <div id="flashOverlay"></div>
+
+<div class="scorer-toast" id="scorerToast"><span id="scorerToastText">#7 SCORER!</span></div>
 
 <div class="winner-overlay" id="winnerOverlay">
   <div class="winner-card">
@@ -962,6 +1042,7 @@
               <div class="flip-face back" id="face1back">0</div>
             </div>
           </div>
+          <div class="last-scorer" id="lastScorer1">Seneste: –</div>
 
           <button class="point-btn" id="btn1"><span class="plus">+</span>1 POINT</button>
           <button class="minus-btn" id="minus1" title="Træk 1 point fra">−1</button>
@@ -983,6 +1064,7 @@
               <div class="flip-face back" id="face2back">0</div>
             </div>
           </div>
+          <div class="last-scorer" id="lastScorer2">Seneste: –</div>
 
           <button class="point-btn" id="btn2"><span class="plus">+</span>1 POINT</button>
           <button class="minus-btn" id="minus2" title="Træk 1 point fra">−1</button>
@@ -1086,12 +1168,14 @@
       <img class="p-photo placeholder" id="pPhoto1" alt="">
       <div class="p-name" id="pName1">Hold 1</div>
       <div class="p-score" id="pScore1">0</div>
+      <div class="p-scorelog" id="pScoreLog1"></div>
     </div>
     <div class="p-vs">VS</div>
     <div class="p-team" id="pTeam2">
       <img class="p-photo placeholder" id="pPhoto2" alt="">
       <div class="p-name" id="pName2">Hold 2</div>
       <div class="p-score" id="pScore2">0</div>
+      <div class="p-scorelog" id="pScoreLog2"></div>
     </div>
   </div>
   <div class="p-result-line" id="pResultLine"></div>
@@ -1297,6 +1381,8 @@
       burstConfetti(btn2, 't2');
     }
     logPlayerPoint(team, playerNum);
+    updateLastScorerDisplay(team);
+    if(playerNumEnabled){ showScorerToast(team, playerNum); }
     updateLeader();
     updateMinusButtons();
     beep();
@@ -1313,11 +1399,13 @@
       localStorage.setItem('sb_score1', state.score1);
       flipScore(flip1, face1front, face1back, state.score1);
       popLastPlayerLog(1);
+      updateLastScorerDisplay(1);
     } else if(team === 2 && state.score2 > 0){
       state.score2--;
       localStorage.setItem('sb_score2', state.score2);
       flipScore(flip2, face2front, face2back, state.score2);
       popLastPlayerLog(2);
+      updateLastScorerDisplay(2);
     }
     updateLeader();
     updateMinusButtons();
@@ -1392,10 +1480,16 @@
   const playerNumEnableCk = $('playerNumEnableCk');
   const statsBtn1El = $('statsBtn1');
   const statsBtn2El = $('statsBtn2');
+  const lastScorer1El = $('lastScorer1');
+  const lastScorer2El = $('lastScorer2');
+  const scorerToast = $('scorerToast');
+  const scorerToastText = $('scorerToastText');
 
   function applyPlayerNumVisibility(){
     statsBtn1El.style.display = playerNumEnabled ? 'block' : 'none';
     statsBtn2El.style.display = playerNumEnabled ? 'block' : 'none';
+    lastScorer1El.style.display = playerNumEnabled ? 'block' : 'none';
+    lastScorer2El.style.display = playerNumEnabled ? 'block' : 'none';
   }
   playerNumEnableCk.checked = playerNumEnabled;
   applyPlayerNumVisibility();
@@ -1404,6 +1498,26 @@
     localStorage.setItem('sb_playerNumEnabled', playerNumEnabled ? '1' : '0');
     applyPlayerNumVisibility();
   });
+
+  function updateLastScorerDisplay(team){
+    const el = team === 1 ? lastScorer1El : lastScorer2El;
+    const log = getPlayerLog(team);
+    if(log.length === 0){ el.textContent = 'Seneste: –'; return; }
+    const last = log[log.length-1];
+    el.textContent = 'Seneste: ' + (last === null || last === undefined ? 'uden nr.' : '#' + last);
+  }
+  updateLastScorerDisplay(1);
+  updateLastScorerDisplay(2);
+
+  let scorerToastTimeout = null;
+  function showScorerToast(team, num){
+    clearTimeout(scorerToastTimeout);
+    scorerToastText.textContent = (num === null || num === undefined ? 'POINT!' : ('#' + num + ' SCORER!'));
+    scorerToast.classList.remove('t1','t2','show');
+    void scorerToast.offsetWidth;
+    scorerToast.classList.add(team === 1 ? 't1' : 't2', 'show');
+    scorerToastTimeout = setTimeout(() => scorerToast.classList.remove('show'), 1150);
+  }
 
   const playerNumOverlay = $('playerNumOverlay');
   const playerNumTitle = $('playerNumTitle');
@@ -1521,6 +1635,23 @@
         statsList.appendChild(row);
       }
     }
+
+    if(log.length > 0){
+      const subtitle = document.createElement('div');
+      subtitle.className = 'stats-subtitle';
+      subtitle.textContent = 'Pointrækkefølge';
+      statsList.appendChild(subtitle);
+
+      const logRow = document.createElement('div');
+      logRow.className = 'stats-log';
+      log.forEach((n, i) => {
+        const chip = document.createElement('span');
+        chip.className = 'stats-log-entry';
+        chip.innerHTML = (i+1) + '. <b>' + (n === null || n === undefined ? 'uden nr.' : '#'+n) + '</b>';
+        logRow.appendChild(chip);
+      });
+      statsList.appendChild(logRow);
+    }
     statsOverlay.classList.add('show');
   }
   $('statsBtn1').addEventListener('click', () => renderStats(1));
@@ -1547,6 +1678,16 @@
     else { pPhoto1.removeAttribute('src'); pPhoto1.classList.add('placeholder'); }
     if(photo2Data){ pPhoto2.src = photo2Data; pPhoto2.classList.remove('placeholder'); }
     else { pPhoto2.removeAttribute('src'); pPhoto2.classList.add('placeholder'); }
+
+    function buildScoreLogHTML(team){
+      if(!playerNumEnabled) return '';
+      const log = getPlayerLog(team);
+      if(log.length === 0) return '';
+      const entries = log.map((n,i) => '<span class="p-scorelog-entry">' + (i+1) + '. <b>' + (n===null||n===undefined?'–':'#'+n) + '</b></span>').join(' ');
+      return '<div class="p-scorelog-title">Pointrækkefølge</div><div>' + entries + '</div>';
+    }
+    $('pScoreLog1').innerHTML = buildScoreLogHTML(1);
+    $('pScoreLog2').innerHTML = buildScoreLogHTML(2);
 
     $('pTeam1').classList.remove('winner');
     $('pTeam2').classList.remove('winner');
