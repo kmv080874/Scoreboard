@@ -1118,6 +1118,8 @@
           <span>Læs scoren højt ved point</span>
           <label class="switch"><input type="checkbox" id="voiceEnableCk"><span class="slider-toggle"></span></label>
         </div>
+        <button class="sound-option" id="voiceTestBtn" style="margin-top:4px;">🔊 Test stemme</button>
+        <div class="custom-sound-name" id="voiceStatus"></div>
       </section>
 
       <section class="settings-section">
@@ -1531,12 +1533,19 @@
   /* ---------- STEMME-OPLÆSNING ---------- */
   let voiceEnabled = localStorage.getItem('sb_voiceEnabled') === '1';
   const voiceEnableCk = $('voiceEnableCk');
+  const voiceStatus = $('voiceStatus');
   voiceEnableCk.checked = voiceEnabled;
+
+  if(!('speechSynthesis' in window)){
+    voiceStatus.textContent = 'Din browser understøtter ikke stemme-oplæsning.';
+  }
+
   voiceEnableCk.addEventListener('change', () => {
     voiceEnabled = voiceEnableCk.checked;
     localStorage.setItem('sb_voiceEnabled', voiceEnabled ? '1' : '0');
     if(voiceEnabled){ speakText('Stemme-oplæsning er slået til.'); }
   });
+  $('voiceTestBtn').addEventListener('click', () => speakText('Dette er en test af stemme-oplæsning.'));
 
   let danishVoice = null;
   function pickDanishVoice(){
@@ -1548,16 +1557,41 @@
     pickDanishVoice();
     speechSynthesis.onvoiceschanged = pickDanishVoice;
   }
+
+  let currentUtterance = null;
   function speakText(text){
-    if(!('speechSynthesis' in window)) return;
+    if(!('speechSynthesis' in window)){
+      voiceStatus.textContent = 'Din browser understøtter ikke stemme-oplæsning.';
+      return;
+    }
     try{
+      pickDanishVoice();
       const utter = new SpeechSynthesisUtterance(text);
-      utter.lang = 'da-DK';
-      if(danishVoice) utter.voice = danishVoice;
+      if(danishVoice){ utter.lang = danishVoice.lang; utter.voice = danishVoice; }
+      // Ingen dansk stemme fundet: lad browseren/TTS-motoren vælge sit eget standardsprog
+      // i stedet for at tvinge 'da-DK', som kan udløse "synthesis-failed" hvis dansk
+      // ikke er installeret som sprogpakke i telefonens tekst-til-tale-motor.
       utter.rate = 1.0;
-      speechSynthesis.cancel();
-      speechSynthesis.speak(utter);
-    }catch(e){}
+      utter.volume = 1.0;
+      utter.pitch = 1.0;
+      utter.onstart = () => { voiceStatus.textContent = '🔊 Taler…'; };
+      utter.onend = () => { voiceStatus.textContent = '✓ Færdig.'; };
+      utter.onerror = (e) => {
+        const code = e.error || 'ukendt';
+        if(code === 'synthesis-failed' || code === 'synthesis-unavailable'){
+          voiceStatus.textContent = 'Fejl: ' + code + '. Virker kun via det rigtige https-link (ikke en lokal fil) — og tjek at dansk er downloadet under telefonens tekst-til-tale-indstillinger.';
+        } else {
+          voiceStatus.textContent = 'Fejl: ' + code + '. Prøv igen, eller tjek telefonens medielydstyrke.';
+        }
+      };
+      currentUtterance = utter;
+      // Kendt Chrome-fejl: speak() lige efter cancel() kan blive tabt stille.
+      // Annullér kun hvis noget rent faktisk taler/venter, og vent ét tick før vi taler.
+      if(speechSynthesis.speaking || speechSynthesis.pending){ speechSynthesis.cancel(); }
+      setTimeout(() => { speechSynthesis.speak(currentUtterance); }, 60);
+    }catch(e){
+      voiceStatus.textContent = 'Fejl: ' + e.message;
+    }
   }
   function speakScore(team, playerNum){
     if(!voiceEnabled) return;
