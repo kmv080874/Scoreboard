@@ -1596,13 +1596,14 @@
   function speakScore(team, playerNum){
     if(!voiceEnabled) return;
     const teamName = team === 1 ? (name1.value.trim() || 'Hold 1') : (name2.value.trim() || 'Hold 2');
+    const oppName = team === 1 ? (name2.value.trim() || 'Hold 2') : (name1.value.trim() || 'Hold 1');
     const ownScore = team === 1 ? state.score1 : state.score2;
     const oppScore = team === 1 ? state.score2 : state.score1;
-    let text = teamName + ' scorer';
+    let text = teamName + ' scorer.';
     if(playerNumEnabled && playerNum !== null && playerNum !== undefined){
-      text = 'Nummer ' + playerNum + ' scorer for ' + teamName;
+      text = 'Spiller nr. ' + playerNum + ' fra ' + teamName + ' scorer.';
     }
-    text += '. Stillingen er ' + ownScore + ' til ' + oppScore + '.';
+    text += ' Stillingen er ' + ownScore + ' point til ' + teamName + ', og ' + oppScore + ' point til ' + oppName + '.';
     speakText(text);
   }
 
