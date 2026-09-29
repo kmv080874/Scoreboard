@@ -1601,7 +1601,7 @@
     const oppScore = team === 1 ? state.score2 : state.score1;
     let text = teamName + ' scorer.';
     if(playerNumEnabled && playerNum !== null && playerNum !== undefined){
-      text = 'Spiller nr. ' + playerNum + ' fra ' + teamName + ' scorer.';
+      text = 'Spiller nummer ' + playerNum + ' fra ' + teamName + ' scorer.';
     }
     text += ' Stillingen er ' + ownScore + ' point til ' + teamName + ', og ' + oppScore + ' point til ' + oppName + '.';
     speakText(text);
